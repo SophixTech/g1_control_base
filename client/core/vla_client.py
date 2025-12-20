@@ -18,7 +18,7 @@ from client.core.save_lerobot import LeRobotDatasetWriter
 from visual.websocket_server import VLAWebSocketServer
 
 
-class VLAClient():
+class VLAClientAsync():
     """VLA (Vision-Language-Action) Client for real-time robot control.
     
     This class manages the complete pipeline for VLA-based robot control, including:
