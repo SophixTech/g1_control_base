@@ -17,6 +17,7 @@ class ModelType(str, Enum):
     TAO = 'tao'
     DM05 = 'dm05'
     WALLX = 'wallx'
+    LINGBOT_VLA = 'lingbot_vla'
 
 def get_mock_config():
     """Generate configuration for MOCK model.
@@ -148,6 +149,17 @@ def get_wallx_config():
     return config
 
 
+def get_lingbot_vla_config():
+    """LingBot package_a2d policy; select a matching checkpoint, stats and horizon."""
+    config = ConfigDict()
+    config.repo_path = str(Path(__file__).resolve().parents[2] / 'lingbot-vla')
+    config.model_path = ''  # Explicit hf_ckpt directory; never choose the latest automatically.
+    config.norm_path = ''  # Normalization statistics from this checkpoint's training data.
+    config.chunk_size = None  # Required: 25 or 50, matching train.chunk_size.
+    config.num_denoising_step = 10
+    return config
+
+
 def get_models_config():
     """Generate configuration for all available VLA models.
     
@@ -175,4 +187,5 @@ def get_models_config():
     config.tao = get_tao_config()
     config.dm05 = get_dm05_config()
     config.wallx = get_wallx_config()
+    config.lingbot_vla = get_lingbot_vla_config()
     return config
