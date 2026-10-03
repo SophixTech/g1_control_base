@@ -205,6 +205,32 @@ def test_manual_gripper_call_is_not_overridden(control_case):
     assert case.sdk.commands == [('gripper', [0.2, 0.4])]
 
 
+def test_default_reset_sends_package_pose_through_correct_sdk_methods(control_case, monkeypatch):
+    case = control_case
+    robot = case.robot
+    # Use synthetic observations and a single planned arm point; no hardware.
+    robot.current_state = np.zeros(22)
+    monkeypatch.setattr(robot, 'retrieve_observation', lambda: {})
+    monkeypatch.setattr(robot, 'ruckig_planning', lambda current, target, *args: [target])
+    for name in ('head', 'waist'):
+        monkeypatch.setattr(case.sdk, f'move_{name}',
+                            lambda values, name=name: case.sdk.commands.append((name, values)),
+                            raising=False)
+    monkeypatch.setattr(case.sdk, 'move_wheel',
+                        lambda linear, angular: case.sdk.commands.append(('wheel', [linear, angular])),
+                        raising=False)
+    robot.reset_robot()
+    commands = dict(case.sdk.commands)
+    assert commands['waist'] == pytest.approx([0.491126, 44.752])
+    assert commands['head'] == pytest.approx([-0.257285, 0.428170])
+    assert commands['gripper'] == pytest.approx([0, 0.217333 / 120])
+    assert commands['arm'][:7] == pytest.approx(
+        [-1.003602, 0.565485, 0.273005, -1.204992, 0.682469, 1.399298, -0.176315])
+    assert commands['arm'][7:] == pytest.approx(
+        [1.074222, -0.611064, -0.279427, 1.283814, -0.730387, -1.495430, 0.187605])
+    assert commands['wheel'] == [0, 0]
+
+
 @pytest.fixture
 def policy_client(control_case):
     import logging

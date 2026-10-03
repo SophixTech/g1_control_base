@@ -1789,7 +1789,11 @@ async def _client_control_reset(req: Optional[ManualControlRequest]):
             name: value for name, value in vars(req or ManualControlRequest()).items()
             if value is not None
         }
-        if len(data) > 1:
+        robot_type = client_state.config.robots.type
+        is_g1 = getattr(robot_type, 'value', robot_type) == 'agibot_g1'
+        # G1 Reset restores its configured package Default pose. Manual panel
+        # selections (including cached values from an older page) are not reset targets.
+        if len(data) > 1 and not is_g1:
             await asyncio.to_thread(robot._control_robot, data)
         else:
             await asyncio.to_thread(robot.reset_robot, mode='default')

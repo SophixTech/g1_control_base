@@ -664,7 +664,9 @@ async function wireEvents() {
   });
 
   $('btn-reset').addEventListener('click',  async () => {
-    if (!(await sendControl('reset', window.getRobotControlPayload?.() || {}))) return;
+    const isG1 = App.config?.robots?.type === 'agibot_g1';
+    const payload = isG1 ? {} : (window.getRobotControlPayload?.() || {});
+    if (!(await sendControl('reset', payload))) return;
     toast('Robot reset initiated.', 'info');
     if (App.isRecording ) {
       const autoCheckRecordMode = $('chk-record-auto');

@@ -40,29 +40,31 @@ def get_agibot_g1_config():
     config.gripper_freq = 40
     config.head_freq = 40
     config.manual_arm_interval = 0.01
+    # Package recovery pose from g1_pc_move_to_package_target_pose.py.
+    # move_waist takes [pitch radians, lift centimetres]; grippers are raw / 120.
     config.action_layout = _ordered_config({
         'arm': {
             'start': 0, 'end': 14, 'policy': 'gradual',
             'presets': {
-                'left': {'Default': [-1.0748, 0.6107, 0.2816, -1.2823, 0.7292, 1.4957, -0.1869], 'Custom': [-1.0748, 0.6107, 0.2816, -1.2823, 0.7292, 1.4957, -0.1869]},
-                'right': {'Default': [1.0720, -0.6103, -0.2780, 1.2822, -0.7299, -1.4929, 0.1873], 'Custom': [1.0720, -0.6103, -0.2780, 1.2822, -0.7299, -1.4929, 0.1873]},
+                'left': {'Default': [-1.003602, 0.565485, 0.273005, -1.204992, 0.682469, 1.399298, -0.176315], 'Custom': [-1.0748, 0.6107, 0.2816, -1.2823, 0.7292, 1.4957, -0.1869]},
+                'right': {'Default': [1.074222, -0.611064, -0.279427, 1.283814, -0.730387, -1.495430, 0.187605], 'Custom': [1.0720, -0.6103, -0.2780, 1.2822, -0.7299, -1.4929, 0.1873]},
             },
         },
         'gripper': {
             'start': 14, 'end': 16, 'policy': 'stepwise',
             'presets': {
                 'left': {'Default': [0.0], 'Custom': [0.5], 'Open': [0.0], 'Close': [1.0]},
-                'right': {'Default': [0.0], 'Custom': [0.5], 'Open': [0.0], 'Close': [1.0]},
+                'right': {'Default': [0.217333 / 120.0], 'Custom': [0.5], 'Open': [0.0], 'Close': [1.0]},
             },
         },
         # policy='manual' is robot/Web-only and must stay after all model policies.
         'head': {
             'start': 16, 'end': 18, 'policy': 'manual',
-            'presets': {'Default': [0.0, 0.4363], 'Custom': [0.0, 0.4363]},
+            'presets': {'Default': [-0.257285, 0.428170], 'Custom': [0.0, 0.4363]},
         },
         'waist': {
             'start': 18, 'end': 20, 'policy': 'manual',
-            'presets': {'Default': [0.4012, 27.0], 'Custom': [0.4012, 27.0]},
+            'presets': {'Default': [0.491126, 44.752], 'Custom': [0.4012, 27.0]},
         },
         'wheel': {
             'start': 20, 'end': 22, 'policy': 'manual',

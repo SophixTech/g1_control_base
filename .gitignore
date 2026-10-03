@@ -147,6 +147,7 @@ a2d_description
 install
 log
 conf/*.yaml
+!conf/lingbot_package.yaml
 !config/default_conf.yaml
 *.svg
 
