@@ -189,6 +189,11 @@ class VLAClient():
     def start_control(self):
         self.is_running = True
         with self._control_execution_lock:
+            if self.is_control_thread_running:
+                return
+            prepare_policy_control = getattr(self.robot, 'prepare_policy_control', None)
+            if prepare_policy_control is not None:
+                prepare_policy_control()
             resume_controls = getattr(self.robot, 'resume_controls', None)
             if resume_controls is not None:
                 resume_controls()

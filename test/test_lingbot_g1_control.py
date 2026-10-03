@@ -203,3 +203,113 @@ def test_manual_gripper_call_is_not_overridden(control_case):
     case = control_case
     case.robot.execute_action({'gripper': [0.2, 0.4]})
     assert case.sdk.commands == [('gripper', [0.2, 0.4])]
+
+
+@pytest.fixture
+def policy_client(control_case):
+    import logging
+    import threading
+    from unittest.mock import Mock
+    from client.core.vla_client import VLAClient
+
+    client = VLAClient.__new__(VLAClient)
+    client.robot = control_case.robot
+    client.logger = logging.getLogger(__name__)
+    client._control_execution_lock = threading.Lock()
+    client.is_running = False
+    client.is_control_thread_running = False
+    client.is_observe_thread_running = False
+    client.is_inference_thread_running = False
+    client.control_thread_timer = Mock()
+    client.control_thread_timer.is_alive.return_value = False
+    client.observe_thread = Mock()
+    client.process_observe_thread = Mock()
+    client.inference_thread = Mock()
+    client.task_language_manager = Mock()
+    client.realtime_data_manager = Mock()
+    client.start_visualize = Mock()
+    client.stop_visualize = Mock()
+    return client
+
+
+def test_start_prepares_before_resuming_controls(policy_client, control_case, monkeypatch):
+    from unittest.mock import Mock
+
+    def check_prepared():
+        assert control_case.robot._left_gripper_hold == pytest.approx(0.3)
+        assert not policy_client.is_control_thread_running
+        assert control_case.sdk.commands == []
+
+    resume = Mock(side_effect=check_prepared)
+    monkeypatch.setattr(control_case.robot, 'resume_controls', resume, raising=False)
+    policy_client.start_control()
+    resume.assert_called_once()
+    assert policy_client.is_control_thread_running
+    policy_client.control_thread_timer.start.assert_called_once()
+    policy_client.task_language_manager.new_task.assert_called_once()
+    control_case.robot.control_robot(target())
+    assert control_case.sdk.commands[-1][1][0] == pytest.approx(0.3)
+
+
+def test_repeated_start_keeps_hold_and_task(policy_client, control_case):
+    policy_client.start_control()
+    control_case.sdk.gripper[0] = 84.0
+    policy_client.start_control()
+    assert control_case.sdk.gripper_reads == 1
+    assert control_case.robot._left_gripper_hold == pytest.approx(0.3)
+    policy_client.task_language_manager.new_task.assert_called_once()
+    policy_client.control_thread_timer.start.assert_called_once()
+
+
+def test_pause_resume_resamples_hold(policy_client, control_case):
+    policy_client.start()
+    control_case.robot.control_robot(target())
+    assert control_case.sdk.commands[-1][1][0] == pytest.approx(0.3)
+    policy_client.pause()
+    assert not policy_client.is_control_thread_running
+    control_case.sdk.gripper[0] = 84.0
+    policy_client.resume()
+    assert policy_client.is_control_thread_running
+    control_case.robot.control_robot(target())
+    assert control_case.sdk.commands[-1][1][0] == pytest.approx(0.7)
+    assert control_case.sdk.gripper_reads == 2
+
+
+def test_prepare_failure_keeps_control_disabled_and_allows_retry(policy_client, control_case, monkeypatch):
+    from unittest.mock import Mock
+
+    resume = Mock()
+    monkeypatch.setattr(control_case.robot, 'resume_controls', resume, raising=False)
+    control_case.sdk.gripper_stamp = control_case.now - 1_000_000_000
+    with pytest.raises(RuntimeError, match='stale'):
+        policy_client.start_control()
+    assert not policy_client.is_control_thread_running
+    assert control_case.robot._left_gripper_hold is None
+    assert control_case.sdk.commands == []
+    resume.assert_not_called()
+    policy_client.control_thread_timer.start.assert_not_called()
+    policy_client.task_language_manager.new_task.assert_not_called()
+    control_case.sdk.gripper_stamp = control_case.now
+    policy_client.start_control()
+    assert policy_client.is_control_thread_running
+    resume.assert_called_once()
+
+
+def test_observe_and_inference_do_not_prepare_or_move(policy_client, control_case):
+    policy_client.start_observe()
+    policy_client.start_inference()
+    assert not policy_client.is_control_thread_running
+    assert control_case.sdk.gripper_reads == 0
+    assert control_case.sdk.commands == []
+    assert control_case.robot._left_gripper_hold is None
+
+
+def test_robot_without_prepare_uses_existing_resume_path(policy_client):
+    from unittest.mock import Mock
+
+    resume = Mock()
+    policy_client.robot = SimpleNamespace(resume_controls=resume)
+    policy_client.start_control()
+    resume.assert_called_once()
+    assert policy_client.is_control_thread_running
+    policy_client.control_thread_timer.start.assert_called_once()
