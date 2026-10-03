@@ -61,6 +61,9 @@ def get_model(config):
     elif config.type == ModelType.WALLX:
         from server.models.wallx import ModelVLA as WallX
         return WallX(config.wallx)
+    elif config.type == ModelType.LINGBOT_VLA:
+        from server.models.lingbot_vla import ModelVLA as LingBot
+        return LingBot(config.lingbot_vla)
     else:
         raise ValueError("Invalid model type")
 
@@ -73,9 +76,14 @@ def parse_args():
     parser = argparse.ArgumentParser(description='VLA Server')
     
     # Keep only the most commonly used parameters
-    parser.add_argument('--model_type', type=str, choices=['mock', 'act', 'gr00t_n1', 'gr00t_n1_5', 'gr00t_n1_6', 'rdt', 'smolvla','go1', 'pi0', 'pi05', 'tao', 'dm05', 'wallx'],
+    parser.add_argument('--model_type', type=str, choices=['mock', 'act', 'gr00t_n1', 'gr00t_n1_5', 'gr00t_n1_6', 'rdt', 'smolvla','go1', 'pi0', 'pi05', 'tao', 'dm05', 'wallx', 'lingbot_vla'],
                        help='Model type to use for inference')
     parser.add_argument('--model_path', type=str, help='Path to the model checkpoint')
+    parser.add_argument('--repo_path', type=str, help='LingBot source repository')
+    parser.add_argument('--norm_path', type=str, help='LingBot training normalization statistics')
+    parser.add_argument('--chunk_size', type=int, choices=[25, 50],
+                        help='LingBot action horizon; must match the checkpoint')
+    parser.add_argument('--num_denoising_step', type=int, help='LingBot denoising iterations')
     parser.add_argument('--debug', action='store_true', help='Enable debug mode, disable Live interface')
     
     return parser.parse_args()
@@ -116,6 +124,16 @@ def override_config_with_args(config, args):
             config.models.dm05.model_path = args.model_path
         elif config.models.type == ModelType.WALLX:
             config.models.wallx.model_path = args.model_path
+        elif config.models.type == ModelType.LINGBOT_VLA:
+            config.models.lingbot_vla.model_path = args.model_path
+
+    if config.models.type == ModelType.LINGBOT_VLA:
+        for key in ('repo_path', 'norm_path', 'chunk_size', 'num_denoising_step'):
+            value = getattr(args, key)
+            if value is not None:
+                config.models.lingbot_vla[key] = value
+        # The policy keeps mutable inference state; serialize calls to this one instance.
+        config.max_infer_workers = 1
 
     return config
 
