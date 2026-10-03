@@ -43,8 +43,7 @@ class RobotBody(RobotBase):
         self._gripper_vmax = 120.0
 
         self.gripper_count = 0
-        self.gripper_cmd = [0.0, 0.0]
-        self.head_count = 0
+        self._left_gripper_hold = None
 
         if self._non_ref_cameras and self._non_ref_fetch_workers > 0:
             self._non_ref_fetch_pool = ThreadPoolExecutor(
@@ -54,51 +53,64 @@ class RobotBody(RobotBase):
 
         time.sleep(1)
 
-    def control_robot(self, action):
-        """Control the robot arm, gripper, and head based on the given action.
-        
-        Args:
-            action (array-like): Action array containing arm commands (0:14), gripper commands (14:16), and head commands (16:18)
-        """
-        action = np.asarray(action)
-        segments = {
-            name: action[v['start']:v['end']]
-            for name, v in self.action_layout.items()
-            if v['end'] <= action.size
-        }
-        if 'arm' in segments:
-            self.execute_action({'arm': segments['arm'].tolist()})
+    @staticmethod
+    def _check_fresh(stamp_ns, label):
+        """Use the existing G1 deployment's 0.5-second feedback age limit."""
+        if not stamp_ns:
+            raise RuntimeError(f'{label} has no timestamp')
+        age_s = abs((time.time_ns() - int(stamp_ns)) / 1e9)
+        if age_s > 0.5:
+            raise RuntimeError(f'{label} is stale ({age_s:.3f}s)')
 
-        if 'gripper' in segments and self.gripper_count % self.config['gripper_freq'] == 0:
+    def _check_live_status(self):
+        arm, arm_stamp = self.robot.arm_joint_states()
+        self._check_fresh(arm_stamp, 'arm state')
+        arm = np.asarray(arm, dtype=float)
+        if arm.shape != (14,) or not np.isfinite(arm).all():
+            raise RuntimeError('arm state must contain 14 finite values')
+        status, status_stamp = self.robot.whole_body_status()
+        self._check_fresh(status_stamp, 'whole_body_status')
+        for key in ('left_arm_error', 'right_arm_error', 'left_end_error',
+                    'right_end_error', 'waist_error', 'lift_error'):
+            if int(status.get(key, 0)) != 0:
+                raise RuntimeError(f'whole_body_status {key}={status[key]}')
+        for key in ('left_arm_estop', 'right_arm_estop'):
+            if bool(status.get(key, False)):
+                raise RuntimeError(f'whole_body_status {key}=true')
+        for key in ('left_arm_control', 'right_arm_control'):
+            if not bool(status.get(key, False)):
+                raise RuntimeError(f'whole_body_status {key}=false')
+
+    def prepare_policy_control(self):
+        """Sample the left gripper hold target without publishing any commands."""
+        self._left_gripper_hold = None
+        self._check_live_status()
+        feedback, stamp = self.robot.gripper_states()
+        self._check_fresh(stamp, 'gripper state')
+        feedback = np.asarray(feedback, dtype=float)
+        if feedback.shape != (2,) or not np.isfinite(feedback).all():
+            raise RuntimeError('gripper state must contain 2 finite values')
+        # Match G's raw/120 hold conversion; do not apply the right-gripper curve.
+        self._left_gripper_hold = float(np.clip(feedback[0] / 120.0, 0.0, 1.0))
+        self.gripper_count = 0
+
+    def control_robot(self, action):
+        """Execute a 16-D policy target: absolute arms, held left gripper, curved right."""
+        action = np.asarray(action, dtype=float)
+        if action.shape != (16,) or not np.isfinite(action).all():
+            raise ValueError('G1 policy action must contain 16 finite values')
+        if self._left_gripper_hold is None:
+            raise RuntimeError('Call prepare_policy_control() before enabling G1 policy control')
+        send_gripper = self.gripper_count % self.config['gripper_freq'] == 0
+        self._check_live_status()
+        self.robot.move_arm(action[:14].tolist())
+        if send_gripper:
+            right = float(np.clip(action[15], 0.0, 1.0))
+            right = right ** 4 / (right ** 4 + (1.0 - right) ** 4)
+            self.robot.move_gripper([self._left_gripper_hold, right])
             self.gripper_count = 0
-            arr = np.clip(segments['gripper'], 0, 1)
-            gripper_optimized = True
-            if gripper_optimized:
-                gamma = 4
-                # adjusted = arr * gamma / (arr * gamma + (1 - arr) ** gamma)
-                adjusted = arr ** gamma / (arr ** gamma + (1 - arr) ** gamma)
-                arr = np.clip(adjusted, 0, 1)
-            self.execute_action({self.config['hand_type']: arr.tolist()})
         self.gripper_count += 1
 
-        if 'head' in segments:
-            if self.head_count % self.config.get('head_freq', 40) == 0:
-                self.head_count = 0
-                head_action = segments['head']
-                self.execute_action({'head': head_action.tolist()})
-            self.head_count += 1
-        if 'waist' in segments:
-            self.execute_action({'waist': segments['waist'].tolist()})
-
-        # Count gripper value changes and send gripper command when accumulated changes reach threshold
-        # new_gripper_cmd = action[14:16]
-        # if abs(new_gripper_cmd[0] - self.gripper_cmd[0]) > 0.75 or abs(new_gripper_cmd[1] - self.gripper_cmd[1]) > 0.75:
-        #     self.gripper_count += 1
-        # if self.gripper_count > self.config['gripper_freq']:
-        #     self.execute_action({self.config['hand_type']: new_gripper_cmd.tolist()})
-        #     self.gripper_cmd = new_gripper_cmd
-        #     self.gripper_count = 0
-    
     def execute_action(self, data):
         """Execute action interface without strategy.
         
