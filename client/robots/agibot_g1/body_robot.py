@@ -37,7 +37,6 @@ class RobotBody(RobotBase):
         ]
 
         self.current_state = np.zeros(self.action_dim, dtype=np.float32)
-        self._obs_state_buffer = np.empty(0, dtype=np.float32)
         self.current_timestamp = 0
 
         self._gripper_vmin = 35.0
@@ -123,9 +122,26 @@ class RobotBody(RobotBase):
         if 'hand' in data:
             self.robot.move_hand(data['hand'])
     
+    @staticmethod
+    def _packet_to_bgr(packet):
+        """Decode one packet to OpenCV BGR using that packet's own format metadata."""
+        if packet is None:
+            raise ValueError('Camera packet is unavailable')
+        data = np.frombuffer(packet.get_image_data(), dtype=np.uint8)
+        if str(packet.encoding_format).endswith(('JPEG', 'PNG')):
+            image = cv2.imdecode(data, cv2.IMREAD_COLOR)
+            if image is None:
+                raise ValueError('Camera packet could not be decoded')
+            return image
+        color_format = str(packet.color_format)
+        if color_format.endswith(('RGB', 'BGR')):
+            image = data.reshape(packet.image_height, packet.image_width, 3)
+            return cv2.cvtColor(image, cv2.COLOR_RGB2BGR) if color_format.endswith('RGB') else image.copy()
+        raise ValueError(f'Unsupported camera color format: {color_format}')
+
     def _fetch_nearest_camera(self, camera_key, camera_name, ref_timestamp):
-        image, _ = self.camera.get_image_nearest(camera_name, ref_timestamp)
-        return camera_key, image
+        packet = self.camera.get_packet_nearest(camera_name, ref_timestamp)
+        return camera_key, self._packet_to_bgr(packet)
 
     def retrieve_observation(self):
         """Retrieve current observation data including camera images and joint states.
@@ -139,17 +155,18 @@ class RobotBody(RobotBase):
             for key, _ in self._non_ref_cameras:
                 result[f'cam.{key}'] = None
 
-            image, ref_timestamp = self.camera.get_latest_image(self._cam_ref_name)
+            packet = self.camera.get_latest_packet(self._cam_ref_name)
+            if packet is None:
+                return None
+            ref_timestamp = packet.send_timestamp
             if self.current_timestamp == ref_timestamp:
                 self.logger.debug("Retrieve image, return None.")
                 time.sleep(0.01)
                 return None
 
             # self.logger.debug(f'Retrieve image time: {(ref_timestamp - self.current_timestamp) / 1e6: .3f}ms')
-            self.current_timestamp = ref_timestamp
-
             result['ref_timestamp'] = ref_timestamp
-            result[f'cam.{self._cam_ref}'] = image[:, :, ::-1]
+            result[f'cam.{self._cam_ref}'] = self._packet_to_bgr(packet)
 
             if self._non_ref_fetch_pool is not None:
                 future_to_key = {
@@ -158,9 +175,10 @@ class RobotBody(RobotBase):
                 }
                 for future in future_to_key:
                     key, image = future.result()
-                    result[f'cam.{key}'] = image[:, :, ::-1]
+                    result[f'cam.{key}'] = image
 
             state_size = 0
+            state_parts = []
             gripper_start = None
             for proprio, joint_states_nearest_fun in self._proprio_funs:
                 currt_joint_states, _ = joint_states_nearest_fun(ref_timestamp)
@@ -169,14 +187,10 @@ class RobotBody(RobotBase):
                 if proprio == 'gripper':
                     gripper_start = state_size
 
-                need = state_size + curr_states.size
-                if self._obs_state_buffer.size < need:
-                    self._obs_state_buffer = np.empty(need, dtype=np.float32)
+                state_parts.append(curr_states)
+                state_size += curr_states.size
 
-                self._obs_state_buffer[state_size:need] = curr_states
-                state_size = need
-
-            result['obs.state'] = self._obs_state_buffer[:state_size].copy()
+            result['obs.state'] = np.concatenate(state_parts)
             if self.current_state.size < state_size:
                 self.current_state = np.zeros(state_size, dtype=np.float32)
 
@@ -186,6 +200,7 @@ class RobotBody(RobotBase):
                 self.current_state[gs] -= self._gripper_vmin
                 self.current_state[gs] /= (self._gripper_vmax - self._gripper_vmin)
 
+            self.current_timestamp = ref_timestamp
             return result
         except Exception as e:
             self.logger.warning("retrieve_observation failed: %s", e, exc_info=True)
