@@ -104,6 +104,8 @@ async def _lifespan(_: FastAPI):
     logger.info("VLA Web Client server started on http://localhost:9000")
     yield
     # ── shutdown ──
+    with client_state.lock:
+        client_state.shutting_down = True
     _shutdown_stop_if_running()
     # Avoid closing low-level robot SDK from a detached daemon cleanup thread,
     # which can crash (segfault) during interpreter shutdown.
@@ -139,6 +141,8 @@ class ClientState:
         self.stopping = False
         self.paused = False
         self.lock = threading.Lock()
+        self.lifecycle_lock = threading.RLock()
+        self.shutting_down = False
         self.ws_clients: set[WebSocket] = set()
         self.ws_lock = threading.Lock()
         self._broadcast_task: Optional[asyncio.Task] = None
@@ -1282,6 +1286,16 @@ def _dict_to_user_conf_yaml(d: dict) -> str:
 #  REST: client control
 # ─────────────────────────────────────────────────────────────────────────────
 def _ensure_vla_client_created():
+    # Keep the expensive construction outside the status lock, but serialize
+    # all callers (Start, Observe, config load) with cleanup.
+    with client_state.lifecycle_lock:
+        with client_state.lock:
+            if client_state.shutting_down:
+                raise RuntimeError("Client is shutting down")
+        return _create_vla_client_locked()
+
+
+def _create_vla_client_locked():
     with client_state.lock:
         if client_state.vla_client is not None:
             return client_state.vla_client
@@ -1670,6 +1684,12 @@ def _shutdown_stop_if_running():
             logger.exception(f"Failed to pause client during shutdown stop sequence: {e}")
 
 def _cleanup():
+    with client_state.lifecycle_lock:
+        _cleanup_locked()
+
+
+def _cleanup_locked():
+    vla_client = robot = None
     try:
         lock_acquired = client_state.lock.acquire(timeout=2.0)
         if not lock_acquired:
@@ -1692,7 +1712,9 @@ def _cleanup():
                 # multiprocessing writer/sub-resources are released before os._exit.
                 vla_client.close()
             except Exception:
-                pass
+                logger.exception("Client cleanup failed; closing robot proxy as fallback")
+                if robot is not None:
+                    robot.close()
     finally:
         del vla_client
         del robot

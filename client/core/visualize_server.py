@@ -6,7 +6,6 @@ import orjson
 import logging
 import time
 import threading
-import os
 import numpy as np
 from typing import Dict, Set, Optional
 from ml_collections import ConfigDict
@@ -19,7 +18,6 @@ class VisualizeServer:
         # including script/uvicorn execution paths.
         self.logger = logging.getLogger(__name__)
         self.config = visualize_config
-        self.kill_port(self.config.port)
         self.clients: Set[websockets.WebSocketServerProtocol] = set()
         self.running = False
 
@@ -42,9 +40,6 @@ class VisualizeServer:
         self.vis_prev_action_vel, self.vis_prev_state_vel, self.vis_prev_origin_vel = None, None, None
         self.start_server()
         self.logger.info("Initializing server on %s:%d", self.config.host, self.config.port)
-
-    def kill_port(self, port):
-        os.system(f'kill -9 $(lsof -t -i:{port})')
 
     def update_image_data(self, imgs: Dict):
         """Update image data.
@@ -425,6 +420,7 @@ class VisualizeServer:
     async def _server_running_fun(self):
         """Start the WebSocket server and the data-sending loop."""
         self.running = True
+        self._loop = asyncio.get_running_loop()
         self._shutdown_event = asyncio.Event()
 
         async with websockets.serve(
@@ -456,7 +452,7 @@ class VisualizeServer:
         if self.server:
             # 触发事件通知异步循环退出
             if hasattr(self, '_shutdown_event') and self._shutdown_event.is_set() is False:
-                self._shutdown_event.set()
+                self._loop.call_soon_threadsafe(self._shutdown_event.set)
             self.logger.info("Server stop signal sent.")
     # def stop_server(self):
     #     """Stop the WebSocket server."""

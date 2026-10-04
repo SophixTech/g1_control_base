@@ -15,8 +15,6 @@ Port layout:
 
 import argparse
 import os
-import signal
-import subprocess
 import sys
 import cv2
 import uvicorn
@@ -36,24 +34,9 @@ def parse_args():
     p.add_argument('--reload', action='store_true', help='Enable hot reload (dev only)')
     return p.parse_args()
 
-def kill_port(port):
-    """Kill processes occupying the Web port, if any."""
-    try:
-        result = subprocess.run(
-            ['lsof', '-t', f'-i:{port}'],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-    except FileNotFoundError:
-        return
-    for value in result.stdout.split():
-        if value.isdigit() and int(value) != os.getpid():
-            os.kill(int(value), signal.SIGKILL)
-
 def main():
     args = parse_args()
-    kill_port(port=args.port)
+    # Let bind report an occupied port; never kill its owner during startup.
 
     exit_code = 0
     logger = None
