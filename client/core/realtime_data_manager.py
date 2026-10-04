@@ -65,6 +65,7 @@ class RealtimeDataManager():
         self.init_observe_timestamp = None
         self.frame_count = 0
         self.action_chunk_fitted = None
+        self.trace_context = None
         self.vel_chunk_fitted = None
         self.acc_chunk_fitted = None
         self.timestamps_fitted = None
@@ -286,7 +287,8 @@ class RealtimeDataManager():
                                 target_chunk_index,
                                 prob_progress=None,
                                 step_indices=None,
-                                gripper_offset=0):
+                                gripper_offset=0,
+                                trace_context=None):
         """Update action chunk with the new fitted action chunk.
 
         Args:
@@ -303,6 +305,7 @@ class RealtimeDataManager():
             action_chunk_smoothed, step_indices, gripper_offset
         )
         with self.action_lock:
+            self.trace_context = dict(trace_context) if trace_context else None
             self.action_chunk_index = target_chunk_index if self.action_chunk_index is not None else 0
             self.action_chunk_fitted = action_chunk_smoothed
             self.vel_chunk_fitted = vel_chunk_smoothed
@@ -343,7 +346,7 @@ class RealtimeDataManager():
         currt_vel = vel_chunk[:, idx].copy() if vel_chunk is not None and idx is not None else None
         currt_acc = acc_chunk[:, idx].copy() if acc_chunk is not None and idx is not None else None
         return currt_act, currt_vel, currt_acc
-    def get_action_fitted(self, mode='control'):
+    def get_action_fitted(self, mode='control', with_trace=False):
         """Get the current action (fitted and raw) indexed by action_chunk_index.
 
         Returns:
@@ -351,11 +354,11 @@ class RealtimeDataManager():
         """
         with self.action_lock:
             if self.action_chunk_index is None:
-                return None, None, None, None
+                return ((None, None, None, None), None) if with_trace else (None, None, None, None)
             if self.raw_action_count == 0:
-                return None, None, None, None
+                return ((None, None, None, None), None) if with_trace else (None, None, None, None)
             if self.action_chunk_fitted.shape[1] == 0:
-                return None, None, None, None
+                return ((None, None, None, None), None) if with_trace else (None, None, None, None)
             if self.mode != 'control' and mode == 'control':
                 # print(f"Switching to control mode, current action_chunk_index={self.action_chunk_index}, reset action_chunk_index to 0.")
                 self.action_chunk_index = 0
@@ -385,7 +388,13 @@ class RealtimeDataManager():
             action_fitted = self.action_chunk_fitted[:, self.action_chunk_index]
             vel_fitted = self.vel_chunk_fitted[:, self.action_chunk_index]
             acc_fitted = self.acc_chunk_fitted[:, self.action_chunk_index]
-            return action_fitted, action_raw, vel_fitted, acc_fitted
+            result = (action_fitted, action_raw, vel_fitted, acc_fitted)
+            if with_trace:
+                context = dict(self.trace_context or {})
+                context.update(fitted_index=int(self.action_chunk_index),
+                               planned_offset_s=float(self.timestamps_fitted[self.action_chunk_index]))
+                return result, context
+            return result
     
     def get_prob_progress(self):
         """Get the current prob_progress value indexed by action_chunk_index.
@@ -446,6 +455,7 @@ class RealtimeDataManager():
             self.avg_intra_traj_time = 0.0
             self.avg_inter_traj_time = 0.0
             self.action_chunk_fitted = None
+            self.trace_context = None
             self.vel_chunk_fitted = None
             self.acc_chunk_fitted = None
             self.timestamps_fitted = None

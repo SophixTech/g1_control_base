@@ -264,7 +264,9 @@ class _RobotWorker:
         """
         while not self._control_stop.is_set():
             try:
-                epoch, action = self._control_queue.get(timeout=0.05)
+                item = self._control_queue.get(timeout=0.05)
+                epoch, action = item[:2]
+                trace_context = item[2] if len(item) > 2 else None
             except queue.Empty:
                 continue
 
@@ -272,14 +274,21 @@ class _RobotWorker:
             # less useful (and less safe) than the latest requested point.
             while True:
                 try:
-                    next_epoch, next_action = self._control_queue.get_nowait()
+                    item = self._control_queue.get_nowait()
+                    next_epoch, next_action = item[:2]
+                    next_trace = item[2] if len(item) > 2 else None
                 except queue.Empty:
                     break
                 # A delayed old-epoch item must not replace a fresh action.
                 if next_epoch >= epoch:
+                    self._trace_discard(trace_context, 'superseded')
                     epoch, action = next_epoch, next_action
+                    trace_context = next_trace
+                else:
+                    self._trace_discard(next_trace, 'old_epoch')
 
             if self._control_failed.is_set():
+                self._trace_discard(trace_context, 'control_failed')
                 continue
 
             try:
@@ -289,16 +298,28 @@ class _RobotWorker:
                     # cannot run once the reset command has completed.
                     with self._control_epoch.get_lock():
                         if epoch != self._control_epoch.value:
+                            self._trace_discard(trace_context, 'paused_or_reset')
                             continue
-                    self._robot.control_robot(action)
+                    if trace_context:
+                        self._robot.control_robot(action, trace_context=trace_context)
+                    else:
+                        self._robot.control_robot(action)
             except BaseException as exc:  # noqa: BLE001 - surfaced to parent
                 self._control_failed.set()
+                trace = getattr(self._robot, '_joint_trace', None)
+                if trace and trace_context:
+                    trace.record('control_error', **trace_context, error=f'{type(exc).__name__}: {exc}')
                 logger.exception('Asynchronous robot control failed')
                 error = (type(exc).__name__, str(exc))
                 try:
                     self._control_error_queue.put_nowait(error)
                 except queue.Full:
                     pass
+
+    def _trace_discard(self, context, reason):
+        trace = getattr(self._robot, '_joint_trace', None)
+        if trace and context:
+            trace.record('command_discard', **context, reason=reason)
 
     # ------------------------------------------------------------------
     # observation publishing
@@ -606,7 +627,7 @@ class RobotProxy:
                     return value
                 raise value
 
-    def control_robot(self, action):
+    def control_robot(self, action, trace_context=None):
         """Queue the newest trajectory action without waiting for an RPC reply."""
         with self._control_submit_lock:
             if not self._control_enabled:
@@ -625,7 +646,10 @@ class RobotProxy:
             action_snapshot = np.array(action, copy=True)
             with self._control_epoch.get_lock():
                 epoch = self._control_epoch.value
-            self._control_queue.put_nowait((epoch, action_snapshot))
+            item = (epoch, action_snapshot)
+            if trace_context is not None:
+                item += (dict(trace_context),)
+            self._control_queue.put_nowait(item)
         return None
 
     def pause_controls(self):

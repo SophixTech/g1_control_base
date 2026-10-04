@@ -2,6 +2,9 @@ import cv2
 import time
 import logging
 import threading
+import os
+import tempfile
+from pathlib import Path
 import numpy as np
 
 from queue import Queue, Empty, Full
@@ -13,6 +16,7 @@ from client.utils import misc
 from client.utils.util import run_time_decorator
 from client.utils.multi_thread_timer import MultiThreadTimer
 from client.core.zmq_client import ZMQClient
+from client.core.joint_trace import JointTrace
 from client.core.inter_chunk_fuser import InterChunkFuser
 from client.core.intra_chunk_smoother import IntraChunkSmoother
 from client.core.realtime_data_manager import RealtimeDataManager
@@ -140,6 +144,22 @@ class VLAClient():
         self.current_prob_progress = 0.0
         # self.info_obs, self.info_act = {}, {}
         self.camera_shape_dict = None
+        self.joint_trace = None
+        self._trace_command_id = 0
+        trace_joint = os.environ.get('OPEN_RAIL_TRACE_JOINT')
+        if trace_joint is not None:
+            if not hasattr(self.robot, 'configure_joint_trace'):
+                raise ValueError('Joint tracing currently requires the G1 robot adapter')
+            root = Path(os.environ.get('OPEN_RAIL_TRACE_DIR', 'logs/joint_traces')).resolve()
+            root.mkdir(parents=True, exist_ok=True)
+            directory = tempfile.mkdtemp(prefix=time.strftime('%Y%m%d_%H%M%S_'), dir=root)
+            self.joint_trace = JointTrace(directory, 'client', int(trace_joint))
+            try:
+                self.robot.configure_joint_trace(directory, int(trace_joint))
+            except Exception:
+                self.joint_trace.close()
+                raise
+            self.logger.info('Joint trace enabled: %s (joint %s)', directory, trace_joint)
         self.control_thread_timer.start()
         self.logger.info('VLAClient initialized.')
 
@@ -198,6 +218,8 @@ class VLAClient():
             if resume_controls is not None:
                 resume_controls()
             self.is_control_thread_running = True
+            if getattr(self, 'joint_trace', None):
+                self.joint_trace.record('control_start')
         if not self.control_thread_timer.is_alive():
             self.control_thread_timer.start()
         # start new task in task_language manager for auto mode
@@ -206,6 +228,8 @@ class VLAClient():
     def stop_control(self):
         with self._control_execution_lock:
             self.is_control_thread_running = False
+            if getattr(self, 'joint_trace', None):
+                self.joint_trace.record('control_stop')
             pause_controls = getattr(self.robot, 'pause_controls', None)
             if pause_controls is not None:
                 pause_controls()
@@ -217,10 +241,14 @@ class VLAClient():
     
     def set_control_period(self, period) -> None:
         self.control_thread_timer.set_interval(period)
+        if getattr(self, 'joint_trace', None):
+            self.joint_trace.record('control_period_applied', period_ms=float(period))
         # self.visualize_thread_timer.set_interval(period)
     
     def set_observe_period(self, speed) -> None:
         self.observe_period = 1.0 / speed / self.config.controller.raw_fps
+        if getattr(self, 'joint_trace', None):
+            self.joint_trace.record('speed_applied', speed=float(speed), raw_period_s=self.observe_period)
         # print(f"Debug: control speed = {speed}")
     
     def _stop_control_thread_on_error(self):
@@ -359,6 +387,8 @@ class VLAClient():
         self.shared_memory_manager.close()
         self.vla_zmq.close()
         self.robot.close()
+        if getattr(self, 'joint_trace', None):
+            self.joint_trace.close()
         self.visualize_server.stop_server()
 
         self.logger.info('VLA client closed.')
@@ -388,6 +418,8 @@ class VLAClient():
             "inference_error": self.inference_error,
             "inference_error_count": self.inference_error_count,
         }
+        trace = getattr(self, 'joint_trace', None)
+        status['joint_trace'] = trace.status if trace else None
         status.update(self.realtime_data_manager.runtime_status)
         return status
 
@@ -579,9 +611,24 @@ class VLAClient():
                 with self._control_execution_lock:
                     if not self.is_control_thread_running:
                         return
-                    action_fitted, action_raw, vel_fitted, acc_fitted = self.realtime_data_manager.get_action_fitted()
+                    trace = getattr(self, 'joint_trace', None)
+                    if trace:
+                        sample, trace_context = self.realtime_data_manager.get_action_fitted(with_trace=True)
+                        action_fitted, action_raw, vel_fitted, acc_fitted = sample
+                    else:
+                        action_fitted, action_raw, vel_fitted, acc_fitted = self.realtime_data_manager.get_action_fitted()
                     if action_fitted is not None:
-                        self.robot.control_robot(action_fitted)
+                        if trace:
+                            self._trace_command_id += 1
+                            trace_context.update(command_id=self._trace_command_id,
+                                                 submit_ns=time.perf_counter_ns())
+                            trace.record('command_submit', **trace_context,
+                                         q=float(action_fitted[trace.joint]),
+                                         planned_velocity=float(vel_fitted[trace.joint]),
+                                         planned_acceleration=float(acc_fitted[trace.joint]))
+                            self.robot.control_robot(action_fitted, trace_context=trace_context)
+                        else:
+                            self.robot.control_robot(action_fitted)
             except Exception as exc:
                 self._stop_control_thread_on_error()
                 self.logger.error("Robot control failed: %s", exc)
@@ -723,6 +770,7 @@ class VLAClient():
                 prob_progress=task_progress_fitted,
                 step_indices=self.robot.get_step_indices(),
                 gripper_offset=self.config.controller.gripper_offset,
+                trace_context=action_data.get('_trace'),
             )
 
             # Compute average inference and trajectory fitting times
@@ -821,6 +869,7 @@ class VLAClient():
                 prob_progress=task_progress_fitted,
                 step_indices=self.robot.get_step_indices(),
                 gripper_offset=self.config.controller.gripper_offset,
+                trace_context=action_data.get('_trace'),
             )
 
             # Compute average inference and trajectory fitting times
@@ -967,9 +1016,25 @@ class VLAClient():
             ref_timestamp = action_raw['ref_timestamp']
             loc_timestamp = action_raw['loc_timestamp']
             # Generate action and timestamp chunks
+            period = self.observe_period
             for index, action in enumerate(pred_action):
                 action_chunk.append(action)
-                timestamp_chunk.append(self.observe_period * index)
+                timestamp_chunk.append(period * index)
+            trace = getattr(self, 'joint_trace', None)
+            if trace:
+                context = action_raw.get('_trace', {})
+                server_status = getattr(getattr(self, 'vla_zmq', None), 'status', {})
+                trace.record('model_chunk', **context,
+                             model_path=server_status.get('model_path'),
+                             observation_pc_s=float(loc_timestamp),
+                             device_observation_stamp=int(ref_timestamp),
+                             observation_joint_rad=action_raw.get('_trace_observation_q'),
+                             raw_period_s=period, speed=float(self.config.controller.speed),
+                             control_period_ms=float(self.config.controller.period),
+                             rdm_mode=self.config.rdm.mode,
+                             intra_chunk_mode=self.config.intra_chunk.intra_chunk_mode,
+                             inter_chunk_mode=self.config.inter_chunk.inter_chunk_mode,
+                             q=[float(point[trace.joint]) for point in pred_action])
             
             # Set first frame timestamp to observation reference timestamp
             timestamp_chunk[0] = ref_timestamp
@@ -992,6 +1057,7 @@ class VLAClient():
                 if isinstance(frame, dict) and isinstance(frame.get('obs'), dict):
                     frame['obs']['language'] = [language]
         request_id = self._next_request_id()
+        request_ns = time.perf_counter_ns()
         # start_time = time.time()
         if not self.vla_zmq.sendMessage(data, meta={'request_id': request_id}):
             return None
@@ -1014,6 +1080,13 @@ class VLAClient():
                 return None
             meta = msg.get('meta') or {}
             if meta.get('request_id') == request_id:
+                if getattr(self, 'joint_trace', None) and isinstance(msg.get('data'), dict):
+                    msg['data']['_trace'] = dict(chunk_id=request_id,
+                                                 request_ns=request_ns,
+                                                 response_ns=time.perf_counter_ns())
+                    observation = data[-1] if isinstance(data, list) else data
+                    msg['data']['_trace_observation_q'] = float(
+                        observation['obs']['state'][self.joint_trace.joint])
                 return msg
             self.logger.warning(f"Drop stale response with unmatched request_id: {meta.get('request_id')}")
     def update_preprocess_func(self):

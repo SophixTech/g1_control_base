@@ -32,10 +32,18 @@ def parse_args():
     p.add_argument('--port', type=int, default=9000, help='Bind port')
     p.add_argument('--conf', type=str, default='default_conf.yaml', help='Configuration file name used to load and save config parameters in /conf directory')
     p.add_argument('--reload', action='store_true', help='Enable hot reload (dev only)')
+    p.add_argument('--trace-joint', type=int, choices=range(14), default=None,
+                   help='Record one G1 arm joint: left 0..6, right 7..13; disabled by default')
+    p.add_argument('--trace-dir', default='logs/joint_traces', help='Joint trace session directory root')
     return p.parse_args()
 
 def main():
     args = parse_args()
+    if args.trace_joint is not None:
+        os.environ['OPEN_RAIL_TRACE_JOINT'] = str(args.trace_joint)
+        os.environ['OPEN_RAIL_TRACE_DIR'] = os.path.abspath(args.trace_dir)
+    else:
+        os.environ.pop('OPEN_RAIL_TRACE_JOINT', None)
     # Let bind report an occupied port; never kill its owner during startup.
 
     exit_code = 0

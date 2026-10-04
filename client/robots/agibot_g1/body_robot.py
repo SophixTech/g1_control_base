@@ -3,10 +3,12 @@ import cv2
 import logging
 import numpy as np
 import pandas as pd
+import threading
 from concurrent.futures import ThreadPoolExecutor
 from a2d_sdk.robot import RobotDds as Robot
 from a2d_sdk.robot import CosineCamera as Camera
 from ..base_robot import RobotBase
+from client.core.joint_trace import JointTrace
 # from copy import copy
 
 
@@ -44,6 +46,9 @@ class RobotBody(RobotBase):
 
         self.gripper_count = 0
         self._left_gripper_hold = None
+        self._joint_trace = None
+        self._trace_feedback_lock = threading.Lock()
+        self._trace_feedback_stamp = None
 
         if self._non_ref_cameras and self._non_ref_fetch_workers > 0:
             self._non_ref_fetch_pool = ThreadPoolExecutor(
@@ -68,6 +73,7 @@ class RobotBody(RobotBase):
         arm = np.asarray(arm, dtype=float)
         if arm.shape != (14,) or not np.isfinite(arm).all():
             raise RuntimeError('arm state must contain 14 finite values')
+        self._record_arm_feedback(arm, arm_stamp)
         status, status_stamp = self.robot.whole_body_status()
         self._check_fresh(status_stamp, 'whole_body_status')
         for key in ('left_arm_error', 'right_arm_error', 'left_end_error',
@@ -94,7 +100,23 @@ class RobotBody(RobotBase):
         self._left_gripper_hold = float(np.clip(feedback[0] / 120.0, 0.0, 1.0))
         self.gripper_count = 0
 
-    def control_robot(self, action):
+    def configure_joint_trace(self, directory, joint):
+        if self._joint_trace is not None:
+            raise RuntimeError('Joint trace is already configured for this robot session')
+        self._joint_trace = JointTrace(directory, 'robot', joint)
+        self._trace_feedback_stamp = None
+
+    def _record_arm_feedback(self, arm, stamp):
+        trace = self._joint_trace
+        if trace is None:
+            return
+        with self._trace_feedback_lock:
+            if stamp == self._trace_feedback_stamp:
+                return
+            self._trace_feedback_stamp = stamp
+            trace.record('feedback', device_stamp_ns=int(stamp), q=float(arm[trace.joint]))
+
+    def control_robot(self, action, trace_context=None):
         """Execute a 16-D policy target: absolute arms, held left gripper, curved right."""
         action = np.asarray(action, dtype=float)
         if action.shape != (16,) or not np.isfinite(action).all():
@@ -103,13 +125,30 @@ class RobotBody(RobotBase):
             raise RuntimeError('Call prepare_policy_control() before enabling G1 policy control')
         send_gripper = self.gripper_count % self.config['gripper_freq'] == 0
         self._check_live_status()
-        self.robot.move_arm(action[:14].tolist())
+        self._send_arm_command(action[:14].tolist(), trace_context, source='policy')
         if send_gripper:
             right = float(np.clip(action[15], 0.0, 1.0))
             right = right ** 4 / (right ** 4 + (1.0 - right) ** 4)
             self.robot.move_gripper([self._left_gripper_hold, right])
             self.gripper_count = 0
         self.gripper_count += 1
+
+    def _send_arm_command(self, positions, trace_context=None, source='manual'):
+        trace = self._joint_trace
+        q = float(positions[trace.joint]) if trace else None
+        send_start_ns = time.perf_counter_ns() if trace else None
+        try:
+            self.robot.move_arm(positions)
+        except Exception as exc:
+            if trace:
+                trace.record('sdk_error', **(trace_context or {}), q=q, source=source,
+                             send_start_ns=send_start_ns, send_end_ns=time.perf_counter_ns(),
+                             error=f'{type(exc).__name__}: {exc}')
+            raise
+        else:
+            if trace:
+                trace.record('sdk_command', **(trace_context or {}), q=q, source=source,
+                             send_start_ns=send_start_ns, send_end_ns=time.perf_counter_ns())
 
     def execute_action(self, data):
         """Execute action interface without strategy.
@@ -118,7 +157,7 @@ class RobotBody(RobotBase):
             data (dict): Dictionary containing arm and gripper commands
         """
         if 'arm' in data:
-            self.robot.move_arm(data['arm'])
+            self._send_arm_command(data['arm'])
         if 'gripper' in data:
             self.robot.move_gripper(data['gripper'])
         if 'hand_as_gripper' in data:
@@ -162,6 +201,12 @@ class RobotBody(RobotBase):
             dict or None: Dictionary containing camera images, joint states, and timestamp. Returns None if no new data is available.
         """
         try:
+            # Latest native feedback (not image-aligned state), including while
+            # policy control is paused. No extra SDK read when tracing is off.
+            if self._joint_trace is not None:
+                arm, stamp = self.robot.arm_joint_states()
+                if stamp and len(arm) == 14 and np.isfinite(arm).all():
+                    self._record_arm_feedback(arm, stamp)
             result = {'ref_timestamp': None, 'obs.state': None}
             result[f'cam.{self._cam_ref}'] = None
             for key, _ in self._non_ref_cameras:
@@ -223,6 +268,8 @@ class RobotBody(RobotBase):
         
         This method properly releases all hardware resources.
         """
+        if self._joint_trace is not None:
+            self._joint_trace.close()
         if self._non_ref_fetch_pool is not None:
             self._non_ref_fetch_pool.shutdown(wait=True)
             self._non_ref_fetch_pool = None
