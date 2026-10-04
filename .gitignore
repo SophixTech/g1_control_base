@@ -80,6 +80,7 @@ __pycache__
 
 # testing and continuous integration
 
+/test/
 .coverage
 .pytest_cache/
 .benchmarks
@@ -112,6 +113,7 @@ __pycache__
 dist
 
 # Log
+/logs/
 *.log
 *.log.*
 
