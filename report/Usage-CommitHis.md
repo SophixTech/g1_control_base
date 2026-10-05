@@ -1,5 +1,24 @@
 # 提交历史记录
 
+## 2026-10-05 部署速查与当前配置整理
+
+### d1a634ebde7b00bcff63cac415c9db8e0680d8a7
+
+时间：2026-10-05 17:38:04 +0800
+标题：`chore(deploy): simplify LingBot quickstart and save current configuration`
+
+用途：简化部署操作文档，并保存已有工作区配置及报告管理调整。
+
+- `README-LingBot-G1.md`：改为按终端和操作顺序组织的部署速查；列出可复制启动命令、模型权重与统计文件路径、chunk 长度、去噪次数、网页操作、退出及日志查看方式。保留现有编辑内容。
+- `conf/lingbot_package.yaml`：保存已有修改，`controller.speed` 从 0.5 改为 1.0，`intra_chunk.intra_chunk_mode` 从 `interpolation` 改为 `fitting`。这些会改变运行行为，不是已经验证的轨迹偏离修复。
+- `.gitignore`：增加 `/reports/`。
+- 移除 Git 中的 `reports/openrail_action_pipeline_20261003.md` 与 `reports/chunk55_reconstruction.svg`；对应文件已在本地 `report/` 中，本次未将被忽略的报告批量重新纳入 Git。
+- 验证：README 的 7 个 Bash 命令块通过 `bash -n`（仅语法检查）；YAML 解析通过；清理文档行尾空格后 `git diff --check` 通过。
+- 未运行模型、未连接真机、未修改跨块融合算法，也未对当前倍率和 fitting 配置做真机验收。
+
+本次历史文档同时保留已有的报告链接调整，指向本地 `report/` 中的文件；新克隆仓库不包含这些被忽略的报告。历史记录另以 `docs(history): record deployment quickstart and configuration commit` 提交，其哈希可通过 `git log -- report/Usage-CommitHis.md` 查询。
+
+
 ## 2026-10-04 按功能整理本次未提交改动
 
 本批次将已有工作区改动拆为五个功能提交，下面按最新提交在前排列。没有实现新的跨块融合算法，没有将异步改成串行，也没有启动模型或连接真机。已有测试目录移除暂存项一并归入清理提交。
@@ -11,7 +30,7 @@
 
 用途：说明模型位置经过客户端处理后，为什么会与最终提交目标产生较大偏离。
 
-- 文件：[动作链路与 min_jerk 计算教程](../reports/openrail_action_pipeline_20261003.md)、[chunk 55 重建图](../reports/chunk55_reconstruction.svg)。
+- 文件：[动作链路与 min_jerk 计算教程](openrail_action_pipeline_20261003.md)、[chunk 55 重建图](chunk55_reconstruction.svg)。
 - 内容包括 30 Hz 与约 267 Hz、两次导数计算、旧块与新块的接入索引、过渡曲线公式、日志证据和读图方法。
 - 保留分析结果和图；临时数值计算 Python 脚本、JSON 及缓存已清理，它们此前未纳入 Git，因此没有删除记录。
 - 验证：文档本地链接存在，重建图随文档提交；未把文字中的改进建议实现为控制代码。
