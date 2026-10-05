@@ -5,7 +5,7 @@ controller:
   gripper_offset: 0
   period: 3.75
   raw_fps: 30
-  speed: 0.5
+  speed: 1.0
   wait_time: 10
 inter_chunk:
   inter_chunk_mode: min_jerk
@@ -26,7 +26,7 @@ intra_chunk:
   fitting_num_samples: 64
   gripper_dim: 2
   head_dim: 2
-  intra_chunk_mode: interpolation
+  intra_chunk_mode: fitting
   joint_dim: 14
   max_gripper_action_threshold: 0.95
   max_gripper_fitting_workers: 2

@@ -65,6 +65,7 @@ pyrightconfig.json
 # miscellaneous
 
 /report/
+/reports/
 .cache/
 doc/_build/
 *.swp
