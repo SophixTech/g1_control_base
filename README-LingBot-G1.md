@@ -8,8 +8,11 @@
 “resume”基于当前状态继续执行
 
 如果希望减缓机器运行速度，同步调整wait time以及speed
+
 可用参数：
+
 较快：speed = 1 、wait time=10
+
 较慢：speed = 0.5、 wait time=300
 
 ## 1. 检查连接（终端 A）
@@ -28,7 +31,7 @@ nvidia-smi
 
 ## 2. 切换 COPILOT（终端 A，已就绪则跳过）
 
-先停止 VR 和其他机器人控制程序。下面命令切换机器人模式并尝试启动通信桥：
+下面命令切换机器人模式并尝试启动通信桥（forwarder）：
 
 ```bash
 cd /home/bjtc/Sophix/g1-open-rail
@@ -45,6 +48,8 @@ scripts/ros_env_wrapper.sh start
 ## 3. 启动模型（终端 B）
 
 修改下面四个参数；示例使用 50 步模型。此命令只提供推理，不控制机器人。
+
+**任务prompt可以在之后启动的网页中进行热修改，不需要在启动推理服务时候修改**
 
 ```bash
 cd /home/bjtc/Sophix/g1-open-rail
@@ -90,7 +95,7 @@ scripts/run_lingbot_g1_client.sh --host 127.0.0.1 --port 9000
 | 按钮 | 作用 / 检查项 |
 |---|---|
 | `Observe` | 读取机器人；确认三路图像和关节反馈持续更新 |
-| `Reset`（需要时） | 移动到软包默认位姿，包括双臂、头、腰及夹爪；不是60秒慢速归位。等待完成后再继续 |
+| `Reset`（需要时） | 移动到软包默认位姿，包括双臂、头、腰及夹爪 |
 | `Infer` | 开始模型推理；确认推理耗时/预测更新，此时不执行模型动作 |
 | `Control` | 开始真机执行模型处理后的目标 |
 | `Pause` | 暂停观测、推理和控制；不是硬件急停 |
@@ -101,7 +106,7 @@ scripts/run_lingbot_g1_client.sh --host 127.0.0.1 --port 9000
 
 常用控制参数在 `conf/lingbot_package.yaml`，可以在网页修改，也可以修改yaml后重启客户端
 
-网页修改控制参数 **“一定一定一定”** 要点“APPLY”,否则不会生效
+网页修改控制参数 ***“一定一定一定”*** 要点“APPLY”,否则不会生效
 
 ## 6. 退出与查看日志
 
