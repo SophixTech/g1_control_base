@@ -64,6 +64,9 @@ def get_model(config):
     elif config.type == ModelType.LINGBOT_VLA:
         from server.models.lingbot_vla import ModelVLA as LingBot
         return LingBot(config.lingbot_vla)
+    elif config.type == ModelType.LINGBOT_ECOT:
+        from server.models.lingbot_ecot import ModelVLA as LingBotECOT
+        return LingBotECOT(config.lingbot_ecot)
     else:
         raise ValueError("Invalid model type")
 
@@ -76,7 +79,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description='VLA Server')
     
     # Keep only the most commonly used parameters
-    parser.add_argument('--model_type', type=str, choices=['mock', 'act', 'gr00t_n1', 'gr00t_n1_5', 'gr00t_n1_6', 'rdt', 'smolvla','go1', 'pi0', 'pi05', 'tao', 'dm05', 'wallx', 'lingbot_vla'],
+    parser.add_argument('--model_type', type=str, choices=['mock', 'act', 'gr00t_n1', 'gr00t_n1_5', 'gr00t_n1_6', 'rdt', 'smolvla','go1', 'pi0', 'pi05', 'tao', 'dm05', 'wallx', 'lingbot_vla', 'lingbot_ecot'],
                        help='Model type to use for inference')
     parser.add_argument('--model_path', type=str, help='Path to the model checkpoint')
     parser.add_argument('--repo_path', type=str, help='LingBot source repository')
@@ -126,6 +129,8 @@ def override_config_with_args(config, args):
             config.models.wallx.model_path = args.model_path
         elif config.models.type == ModelType.LINGBOT_VLA:
             config.models.lingbot_vla.model_path = args.model_path
+        elif config.models.type == ModelType.LINGBOT_ECOT:
+            config.models.lingbot_ecot.model_path = args.model_path
 
     if config.models.type == ModelType.LINGBOT_VLA:
         for key in ('repo_path', 'norm_path', 'chunk_size', 'num_denoising_step'):
@@ -133,6 +138,13 @@ def override_config_with_args(config, args):
             if value is not None:
                 config.models.lingbot_vla[key] = value
         # The policy keeps mutable inference state; serialize calls to this one instance.
+        config.max_infer_workers = 1
+
+    if config.models.type == ModelType.LINGBOT_ECOT:
+        for key in ('repo_path', 'norm_path', 'chunk_size', 'num_denoising_step'):
+            value = getattr(args, key)
+            if value is not None:
+                config.models.lingbot_ecot[key] = value
         config.max_infer_workers = 1
 
     return config

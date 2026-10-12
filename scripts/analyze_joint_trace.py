@@ -163,6 +163,7 @@ def render_report(directory, result, warnings):
 <p>横轴统一为 PC 单调时钟。SDK 调用返回不代表电机收到或开始执行。反馈曲线按 PC 读到反馈的时刻绘制；设备原始采样时间戳保存在 CSV 中，未假设与 PC 同步。</p>
 <p>模型虚线是原始预测点的线性连接；目标差值使用同一块、同一 planned_offset 的线性参考，不等于模型“错误”。规划插值和块间衔接本来就可能改变目标。Reset/手动移动也记录 SDK 目标，但没有模型块对应关系。</p>
 <label>预测块 <select id="chunk"></select></label><label>起始秒 <input id="lo" type="number" value="0" step="0.1"></label><label>结束秒 <input id="hi" type="number" step="0.1"></label><button id="draw">更新范围</button>
+<section><h2>前后两块如何接续</h2><label>选择实际提交中的切换 <select id="transition"></select></label><p id="transition-info"></p><div class="plot"><canvas id="transition-plot"></canvas></div><p>虚线：模型对 A、B 两块的完整原始预测，按各自观测时刻对齐。实线：经过块内处理和块间衔接后，客户端实际提交的目标。圆点：各次提交采样；两点之间的线仅用于阅读。竖线：首次提交 B 块目标的时刻，不是平滑计算开始时刻。未提交的平滑轨迹及精确过渡终点没有记录，不能从此图恢复。</p></section>
 <section><h2>位置（rad）</h2><div class="plot"><canvas id="position"></canvas></div></section>
 <section><h2>目标处理差异（rad）</h2><div class="plot"><canvas id="difference"></canvas></div></section>
 <section><h2>相邻样本差分速度（rad/s）</h2><p>下发曲线是命令目标变化率；反馈曲线按设备采样间隔求导、按 PC 观察时刻定位。噪声会放大，均不作为控制限值。</p><div class="plot"><canvas id="velocity"></canvas></div></section>
@@ -176,6 +177,34 @@ if(D.commands.length)pick.value=D.commands[D.commands.length-1].chunk_id;
 document.getElementById('hi').value=D.commands.concat(D.feedback).reduce((v,e)=>Math.max(v,sec(e.send_end_ns||e.mono_ns)),1).toFixed(2);
 const line=(label,data,color,dash=[])=>({label,data,borderColor:color,borderDash:dash,borderWidth:1.4,pointRadius:0,tension:0,spanGaps:false});
 const charts=[];
+const transitions=[];
+for(let i=1;i<D.submits.length;i++){
+ const a=D.submits[i-1],b=D.submits[i];
+ if(a.chunk_id&&b.chunk_id&&a.chunk_id!==b.chunk_id)transitions.push({a,b,index:i});
+}
+const transitionPick=document.getElementById('transition');
+transitions.forEach((t,i)=>{const o=document.createElement('option');o.value=i;o.textContent=`${i+1}: ${t.a.chunk_id} → ${t.b.chunk_id}`;transitionPick.append(o)});
+let transitionChart;
+function drawTransition(){
+ if(transitionChart)transitionChart.destroy();
+ const t=transitions[Number(transitionPick.value)];
+ if(!t){document.getElementById('transition-info').textContent='没有记录到动作块之间的提交切换。';return}
+ const a=D.models.find(m=>m.chunk_id===t.a.chunk_id),b=D.models.find(m=>m.chunk_id===t.b.chunk_id);
+ const switchTime=sec(t.b.submit_ns), sets=[];
+ for(const [m,label,color] of [[a,'A 原始预测','#a044c4'],[b,'B 原始预测','#168b59']]){
+  if(m){const s=line(label,m.q.map((q,i)=>({x:sec(m.observation_pc_s*1e9)+i*m.raw_period_s,y:q})),color,[5,4]);s.pointRadius=2;sets.push(s)}
+ }
+ let start=t.index-1,end=t.index;
+ while(start>0&&D.submits[start-1].chunk_id===t.a.chunk_id)start--;
+ while(end+1<D.submits.length&&D.submits[end+1].chunk_id===t.b.chunk_id)end++;
+ const submitted=D.submits.slice(start,end+1);
+ const actual=line('平滑后实际提交目标',submitted.map(c=>({x:sec(c.submit_ns),y:c.q})),'#e88a14');actual.pointRadius=1.5;sets.push(actual);
+ const points=sets.flatMap(s=>s.data),ys=points.map(p=>p.y);
+ sets.push(line('首次提交 B 块',[{x:switchTime,y:Math.min(...ys)-.01},{x:switchTime,y:Math.max(...ys)+.01}],'#555',[3,3]));
+ transitionChart=new Chart(document.getElementById('transition-plot'),{type:'line',data:{datasets:sets},options:{animation:false,maintainAspectRatio:false,parsing:false,interaction:{mode:'nearest',intersect:false},scales:{x:{type:'linear',title:{display:true,text:'PC 相对时间 / 秒'}}}}});
+ document.getElementById('transition-info').textContent=`切换发生在 ${switchTime.toFixed(3)} 秒。最后提交的 A 点位于 A 计划起点之后 ${t.a.planned_offset_s.toFixed(3)} 秒；首次提交的 B 点位于 B 计划起点之后 ${t.b.planned_offset_s.toFixed(3)} 秒。这里是提交记录中的切换位置，不等同于算法内部选取的平滑起止点。`;
+}
+transitionPick.onchange=drawTransition;drawTransition();
 function derivative(rows,time,device=false){const out=[];for(let i=1;i<rows.length;i++){const a=rows[i-1],b=rows[i],dt=(time(b)-time(a))/1e9;if(dt>0)out.push({x:sec(device?b.mono_ns:time(b)),y:(b.q-a.q)/dt})}return out}
 function draw(){charts.forEach(c=>c.destroy());charts.length=0;
  const lo=Number(document.getElementById('lo').value),hi=Number(document.getElementById('hi').value);
