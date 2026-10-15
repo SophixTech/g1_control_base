@@ -19,6 +19,8 @@ class ModelType(str, Enum):
     WALLX = 'wallx'
     LINGBOT_VLA = 'lingbot_vla'
     LINGBOT_ECOT = 'lingbot_ecot'
+    LINGBOT_ORI = 'lingbot_ori'
+    LINGBOT_NEWARTI = 'lingbot_newarti'
 
 def get_mock_config():
     """Generate configuration for MOCK model.
@@ -172,6 +174,28 @@ def get_lingbot_ecot_config():
     return config
 
 
+def get_lingbot_ori_config():
+    """Independent ORI deployment; never inherit the legacy LingBot config."""
+    config = ConfigDict()
+    config.repo_path = str(Path(__file__).resolve().parents[2] / 'ORI-lingbot-vla')
+    config.model_path = ''
+    config.norm_path = ''
+    config.chunk_size = 50
+    config.num_denoising_step = 10
+    return config
+
+
+def get_lingbot_newarti_config():
+    """Independent NEWARTI deployment; never inherit the legacy LingBot config."""
+    config = ConfigDict()
+    config.repo_path = str(Path(__file__).resolve().parents[2] / 'ORI-lingbo-vla-newarti')
+    config.model_path = ''
+    config.norm_path = ''
+    config.chunk_size = 50
+    config.num_denoising_step = 10
+    return config
+
+
 def get_models_config():
     """Generate configuration for all available VLA models.
     
@@ -201,4 +225,6 @@ def get_models_config():
     config.wallx = get_wallx_config()
     config.lingbot_vla = get_lingbot_vla_config()
     config.lingbot_ecot = get_lingbot_ecot_config()
+    config.lingbot_ori = get_lingbot_ori_config()
+    config.lingbot_newarti = get_lingbot_newarti_config()
     return config
