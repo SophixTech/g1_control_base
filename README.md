@@ -325,6 +325,8 @@ Every run writes two evaluation logs under `eval/`: `eval_log.json` keeps the ra
 
 ## 📚 Documentation
 
+Local G1 hardware setup, communication checks, COPILOT switching, and the restored forwarder are documented in [hardware/g1](hardware/g1/README.md). Model and web-client launchers remain in `scripts/`.
+
 | Document | Description |
 | --- | --- |
 | 🚀 [docs/getting-started.md](docs/getting-started.md) | Installation and first run |

@@ -1,7 +1,5 @@
 #!/bin/zsh
-# Script to run A2D SDK robot service
-# Changes to a2d_sdk directory, sources environment, and starts robot service with copilot configuration
-cd a2d_sdk
-source env.zsh
-python robot_service.py -s -c ./conf/copilot.pbtxt
-cd ..
+# Legacy entry: use the maintained hardware mode-switch script.
+# With no arguments this performs only preflight checks.
+ROOT="$(cd -- "$(dirname -- "$0")/.." && pwd)"
+exec bash "$ROOT/hardware/g1/g1_enter_copilot.sh" "$@"

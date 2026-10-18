@@ -325,6 +325,8 @@ Parquet 保存观测、状态和动作；视频按相机 key 分目录保存。
 
 ## 📚 文档
 
+本机 G1 的环境准备、通信检查、COPILOT 切换和恢复后的 forwarder 已集中到 [hardware/g1](hardware/g1/README.md)。模型服务和网页客户端入口仍在 `scripts/`。
+
 | 文档                                                         | 说明                         |
 | ------------------------------------------------------------ | ---------------------------- |
 | 🚀 [docs-cn-backup/getting-started.zh-CN.md](docs-cn-backup/getting-started.zh-CN.md)         | 安装与首次运行               |

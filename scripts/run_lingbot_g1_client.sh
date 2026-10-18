@@ -10,7 +10,7 @@ if [[ ! -f "$OPEN_RAIL_ROOT/conf/lingbot_package.yaml" ]]; then
     exit 1
 fi
 
-source "$OPEN_RAIL_ROOT/scripts/g1_pc_gdk_env.sh"
+source "$OPEN_RAIL_ROOT/hardware/g1/g1_pc_gdk_env.sh"
 cd -- "$OPEN_RAIL_ROOT"
 # The web process and RobotProxy's spawned worker share the local client environment.
 exec "$OPEN_RAIL_ROOT/.venv/bin/python" "$OPEN_RAIL_ROOT/run_web_client.py" \

@@ -2,7 +2,7 @@
 
 真机按步骤启动见 [真机启动 README](../../../README-LingBot-G1.md)，包含每条命令的作用与预期现象。
 
-所有部署入口均从 Open-RAIL 的 `scripts/` 启动。模型服务和机器人客户端使用独立环境，通过 ZMQ 通信。
+模型与网页入口位于 `scripts/`，硬件准备入口位于 [`hardware/g1/`](../../../hardware/g1/README.md)。模型服务和机器人客户端使用独立环境，通过 ZMQ 通信。
 
 | 进程 | 解释器 | 运行依赖 |
 | --- | --- | --- |
@@ -16,14 +16,14 @@
 已安装 uv 时，在 Open-RAIL 根目录运行：
 
 ```bash
-scripts/setup_g1_env.sh
+hardware/g1/setup_g1_env.sh
 source .venv/bin/activate
 ```
 
 脚本使用 `uv venv` 创建 `.venv`，再用 `uv pip install` 安装本项目及 SDK。uv 的环境与安装方式见[官方文档](https://docs.astral.sh/uv/pip/environments/)。
 
 - 默认基础解释器为 `/usr/bin/python3.10`，可用 `OPEN_RAIL_BASE_PYTHON` 覆盖。
-- 默认厂家目录为相邻 `g1/vendor_packages/a2d_sdk-1.5.0`，可用 `GDK_DIR` 覆盖。需要其中的 `a2d_sdk`、`genie_msgs_pb`、对应架构的 `cosine_bus` wheel。
+- 默认厂家目录为本仓库 `hardware/g1/vendor_packages/a2d_sdk-1.5.0`，可用 `GDK_DIR` 覆盖。需要其中的 `a2d_sdk`、`genie_msgs_pb`、对应架构的 `cosine_bus` wheel。
 - `UV_BIN` 可指定 uv 路径。本机 uv 安装于 `~/.local/bin/uv`。
 - ruckig 若需要源码构建，脚本固定兼容的构建工具范围，默认最多使用 2 个编译任务。
 - `.venv/` 已被 Git 忽略；脚本不改原 GDK 或 LingBot 训练环境。
@@ -36,10 +36,10 @@ source .venv/bin/activate
 环境准备已迁入本仓库：
 
 ```bash
-source scripts/g1_pc_gdk_env.sh
+source hardware/g1/g1_pc_gdk_env.sh
 ```
 
-它激活本地 `.venv`，加载厂家 `env.sh` 提供的日志、库路径和 ROS 设置，再按到 `10.42.0.101` 的路由选择本机 IP，设置发现服务、网段与 `USE_PTP_CLOCK=OFF`。不再调用 `G/g1_pc_gdk_env.sh`。仍需保留厂家底层运行目录；其 `env.sh` 可能刷新 ROS daemon。
+它激活本地 `.venv`，加载本机 ROS 和恢复的运行库，按到 `10.42.0.101` 的路由固定本机 IP、Aorta 发现设置和 `USE_PTP_CLOCK=OFF`。不再读取已删除的旧 `g1` 目录。
 
 客户端启动脚本会自动执行上述准备，无需重复 source：
 
@@ -58,18 +58,18 @@ scripts/run_lingbot_g1_client.sh --host 127.0.0.1 --port 9000
 模式切换入口已迁入本仓库。从 Open-RAIL 根目录先运行只读检查：
 
 ```bash
-scripts/g1_enter_copilot.sh
+hardware/g1/g1_enter_copilot.sh
 ```
 
 它通过 SSH 检查 Orin 的常驻模式服务，不切换模式。需要实际切换时，执行：
 
 ```bash
-scripts/g1_enter_copilot.sh --execute --confirm SWITCH_FROM_VR_TO_COPILOT
+hardware/g1/g1_enter_copilot.sh --execute --confirm SWITCH_FROM_VR_TO_COPILOT
 ```
 
 脚本使用本仓库环境脚本和 `.venv/bin/python`，依次切换 `idle → COPILOT`，再检查机器人组件和 PC forwarder 的反馈。模式切换是独立准备步骤；启动网页或模型不会自动调用它，也不会因此直接开始执行模型动作。
 
-厂家目录默认引用相邻 `g1/vendor_packages/a2d_sdk-1.5.0`，SSH 密钥默认引用相邻 `g1/orin_g1_ed25519`，分别可通过 `GDK_DIR`、`ORIN_KEY` 覆盖。旧 G 模式切换脚本已不再是本部署入口的依赖，密钥和厂家运行文件没有复制。软包归位与 Orin 模式服务安装修复仍使用原工具，具体步骤见 [真机启动 README](../../../README-LingBot-G1.md)。
+厂家运行目录为 `hardware/g1/vendor_packages/a2d_sdk-1.5.0`，SSH 密钥为 `.local/robot/orin_g1_ed25519`，可分别通过 `GDK_DIR`、`ORIN_KEY` 覆盖。运行文件和密钥已加入 Git 忽略规则。恢复后的 forwarder 已独立启动并通过 SDK 与 ROS 实样检查，详见 [硬件说明](../../../hardware/g1/README.md)。
 
 迁移已通过语法检查和 4 项离线模拟验证，尚未实际切换真机。模式切换时先停止已有自动控制；G 的旧控制入口不能与 Open-RAIL 同时执行。
 
@@ -95,7 +95,7 @@ scripts/run_lingbot_server.sh \
 - M03：26 项假模型测试通过；真实 GPU 推理按用户要求暂缓，避免影响训练。
 - M04：客户端入口与环境准备脚本已迁入 Open-RAIL。本地 Python 3.10 `.venv` 已由 uv 创建，47 个包的依赖检查通过；Web 应用、VLAClient、RobotProxy、RobotBody 和 SDK 导入及网页入口 `--help` 通过。任务配置已由 M08 补齐，真机验收仍待 M09。
 
-- M04a：`scripts/g1_enter_copilot.sh` 已迁入，调用本仓库环境和 Python；4 项离线模拟验证通过，真机模式切换待验收。
+- M04a：`hardware/g1/g1_enter_copilot.sh` 已迁入，调用本仓库环境和 Python；4 项离线模拟验证通过，真机模式切换待验收。
 
 - M05：观测状态与图像颜色已适配，9 项离线测试通过。
 - M06：双臂使用绝对目标；左夹爪保持采样值，右夹爪保留四次方处理；发送前检查反馈和整机状态。新增 36 项假 SDK 测试通过。

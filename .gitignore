@@ -51,6 +51,10 @@ pip-wheel-metadata/
 .python-version
 .idea
 .venv/
+/.local/
+/vendor_packages/
+/vendor_packages
+/hardware/g1/vendor_packages/
 .vscode/
 /*.iml
 pyrightconfig.json

@@ -27,7 +27,15 @@ nvidia-smi
 
 机器人须能 ping 通。模型与自标注/训练共用 GPU，显存不足时先结束或等待其他 GPU 任务。
 
-客户端环境缺失时才执行：`scripts/setup_g1_env.sh`。
+硬件脚本、模式配置与 forwarder 已集中到 [`hardware/g1/`](hardware/g1/README.md)。现有 `.venv` 可直接使用；仅在持有完整厂商 wheel 安装包且需要重建环境时执行 `hardware/g1/setup_g1_env.sh`。
+
+机器人已在 COPILOT 时，可先只读验证关节、夹爪和三路相机：
+
+```bash
+hardware/g1/g1_check_communication.sh
+```
+
+输出 `communication_ok: true` 表示通信正常，不代表已经授权运动。
 
 ## 2. 切换 COPILOT（终端 A，已就绪则跳过）
 
@@ -35,14 +43,14 @@ nvidia-smi
 
 ```bash
 cd /home/bjtc/Sophix/g1-open-rail
-scripts/g1_enter_copilot.sh --execute --confirm SWITCH_FROM_VR_TO_COPILOT
+hardware/g1/g1_enter_copilot.sh --execute --confirm SWITCH_FROM_VR_TO_COPILOT
 ```
 
 如果没有forwarder，在单独终端运行并保持打开：
 
 ```bash
 cd /home/bjtc/Sophix/g1-open-rail
-scripts/ros_env_wrapper.sh start
+hardware/g1/ros_env_wrapper.sh start
 ```
 
 ## 3. 启动模型（终端 B）
@@ -127,5 +135,5 @@ xdg-open "$TRACE_DIR/report.html"
 
 ```bash
 cd /home/bjtc/Sophix/g1-open-rail
-scripts/ros_env_wrapper.sh stop
+hardware/g1/ros_env_wrapper.sh stop
 ```
