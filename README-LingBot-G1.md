@@ -137,3 +137,66 @@ xdg-open "$TRACE_DIR/report.html"
 cd /home/bjtc/Sophix/g1-open-rail
 hardware/g1/ros_env_wrapper.sh stop
 ```
+
+## 可选训练图像裁剪（ORI / NEWARTI）
+
+在原有**模型服务端**启动命令后增加 `--image_profile crop_1016`，例如：
+
+```bash
+scripts/run_lingbot_ori_server.sh \
+  --model_path /path/to/checkpoint \
+  --norm_path /path/to/norm_stats.json \
+  --image_profile crop_1016
+```
+
+NEWARTI 的 `scripts/run_lingbot_newarti_server.sh` 同样支持此参数。使用实际权重及其训练统计路径替换示例；修改配置后需重启模型服务，停止当前 Control 后再切换，避免混用旧动作队列。
+
+| 参数 | 图像处理 |
+| --- | --- |
+| `--image_profile original`（默认） | 保留现有输入，不额外裁剪；模型自身的 resize 和归一化照常执行。 |
+| `--image_profile crop_1016` | 头部先统一为 768×480，再裁 `(x=200,y=0,w=480,h=480)`；左腕裁 `(184,0,480,480)`；两路缩放到 224×224，右腕保留原路径。 |
+
+尺寸均为宽×高。裁剪模式只接受头部 1280×800 或 768×480，以及左右腕 848×480；其他尺寸（含已裁剪的 224×224）报错，避免误裁和重复处理。处理位于模型适配层，客户端原始画面与记录不变，也不修改 state、action 或 Reset 位姿。启动日志显示 profile，首次处理各相机时打印源尺寸、ROI 和输出尺寸。
+
+头部初次缩放使用 Pillow Lanczos，ROI 缩放使用 Pillow Bicubic。几何视野与 `crop_1016.py` 对齐，但 Pillow 与训练 FFmpeg 的缩放实现、JPEG/H.264 压缩存在差异，不保证逐像素相同。上线前应以实际训练视频抽帧核对；本项离线测试不代表已经完成实机模型推理验收。NEWARTI 若另行显示 ECOT bbox，裁剪坐标不能直接叠加到原始头部画面，需先逆变换。
+
+## 右夹爪开合诊断
+
+在**客户端**启动命令增加参数（与模型服务的图像裁剪参数无关）：
+
+```bash
+scripts/run_lingbot_ori_g1_client.sh --trace-gripper right --trace-dir logs/gripper_traces
+# NEWARTI 使用 scripts/run_lingbot_newarti_g1_client.sh，参数相同。
+```
+
+`--trace-gripper right` 与 `--trace-joint` 互斥。启动会创建独立会话子目录并打印路径。正常停止 Control 后退出客户端，使异步日志完成落盘。随后可导出 CSV：
+
+```bash
+python3 scripts/export_gripper_trace.py logs/gripper_traces/实际会话目录
+```
+
+| 文件 / 事件 | 含义 |
+| --- | --- |
+| `client.jsonl` / `model_chunk` | 收到的模型 action chunk 中第 15 维右夹爪序列（索引从 0 开始），含 chunk ID。 |
+| `client.jsonl` / `command_submit` | 平滑、融合、偏移后提交给机器人子进程的逐步目标。 |
+| `robot.jsonl` / `sdk_command` | 实际调用 SDK 成功返回的右夹爪目标 `q`；含曲线前 `input_target`、chunk/command ID 和调用时间。成功返回不等于机器人已到位。 |
+| `robot.jsonl` / `gripper_skipped` | 因 `gripper_freq` 发送分频而跳过该步夹爪下发。 |
+| `robot.jsonl` / `feedback` | 每次观测轮询读取的右夹爪原始反馈；用 PC 时间比较，可包含重复值。SDK 的成对反馈时间戳属于左夹爪，已单独标注，不作右夹爪时间戳。 |
+| `robot.jsonl` / `sdk_error`、`command_discard`、`control_error` | 调用失败、队列丢弃或控制异常。 |
+| `gripper.csv` | 上述事件按 PC 时间整理，模型 chunk 展开为每个预测步；预测步的计划时间在 `planned_offset_s`，并非实际发送时间。 |
+
+当前 fitting 配置下：夹爪先用半窗口 4（最多 9 点）滑动平均，再在 `<0.05` / `>0.95` 时吸附到 0 / 1，随后对相邻过滤值取平均以填充控制采样。`gripper_offset=5` 提前选取后续 5 个处理后采样的目标，不是 5 个原始模型帧。机器人层每 9 次控制调用发送一次夹爪指令（`gripper_freq=9` 是分频，不是 9 Hz）。
+
+右夹爪发送前将值限制在 0～1，并执行 `g(x)=x^4/(x^4+(1-x)^4)`，会放大 0.5 附近的变化。左夹爪在自动控制时保持启动时采样的位置。以上处理本次均未修改。
+
+定位时按 `model_chunk → command_submit → sdk_command → feedback` 比较：先确认模型是否已经反复预测开合，再检查处理和映射后变化，最后比较实际响应。反馈是原始位置量，SDK 命令是 0～1，不能直接计算两者差值。旧 `analyze_joint_trace.py` 只适用于手臂弧度日志，不用于夹爪。
+
+### 网页展示裁剪视野
+
+模型服务使用 `--image_profile crop_1016` 时，客户端可增加：
+
+```bash
+scripts/run_lingbot_ori_g1_client.sh --preview-image-profile crop_1016
+```
+
+头部、左腕预览采用模型相同的 ROI/缩放规则，右腕保持原图。预览从实际传输 JPEG 解码后处理，只用于显示，额外 JPEG 编码可能有轻微像素差异；推理传输和原始记录不变，服务端仍只裁剪一次。两个进程的参数需配对设置；客户端预览参数不会自动开启服务端裁剪。恢复默认显示可省略该参数或使用 `--preview-image-profile original`。

@@ -31,14 +31,22 @@ def parse_args():
     p.add_argument('--host', default='0.0.0.0', help='Bind host')
     p.add_argument('--port', type=int, default=9000, help='Bind port')
     p.add_argument('--conf', type=str, default='default_conf.yaml', help='Configuration file name used to load and save config parameters in /conf directory')
+    p.add_argument('--preview-image-profile', choices=['original', 'crop_1016'], default='original',
+                   help='Display camera crop matching the model; does not crop inference transport')
     p.add_argument('--reload', action='store_true', help='Enable hot reload (dev only)')
-    p.add_argument('--trace-joint', type=int, choices=range(14), default=None,
+    trace_group = p.add_mutually_exclusive_group()
+    trace_group.add_argument('--trace-gripper', choices=['right'],
+                             help='Record right gripper chunks, SDK commands and feedback')
+    trace_group.add_argument('--trace-joint', type=int, choices=range(14), default=None,
                    help='Record one G1 arm joint: left 0..6, right 7..13; disabled by default')
     p.add_argument('--trace-dir', default='logs/joint_traces', help='Joint trace session directory root')
     return p.parse_args()
 
 def main():
     args = parse_args()
+    os.environ['OPEN_RAIL_PREVIEW_IMAGE_PROFILE'] = args.preview_image_profile
+    if args.trace_gripper == 'right':
+        args.trace_joint = 15
     if args.trace_joint is not None:
         os.environ['OPEN_RAIL_TRACE_JOINT'] = str(args.trace_joint)
         os.environ['OPEN_RAIL_TRACE_DIR'] = os.path.abspath(args.trace_dir)

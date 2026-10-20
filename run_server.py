@@ -93,6 +93,8 @@ def parse_args():
     parser.add_argument('--chunk_size', type=int, choices=[25, 50],
                         help='LingBot action horizon; must match the checkpoint')
     parser.add_argument('--num_denoising_step', type=int, help='LingBot denoising iterations')
+    parser.add_argument('--image_profile', choices=['original', 'crop_1016'],
+                        help='ORI/NEWARTI camera preprocessing (default: original)')
     parser.add_argument('--debug', action='store_true', help='Enable debug mode, disable Live interface')
     
     return parser.parse_args()
@@ -170,6 +172,14 @@ def override_config_with_args(config, args):
             if value is not None:
                 config.models.lingbot_newarti[key] = value
         config.max_infer_workers = 1
+
+    image_profile = getattr(args, 'image_profile', None)
+    if image_profile is not None:
+        targets = {ModelType.LINGBOT_ORI: 'lingbot_ori',
+                   ModelType.LINGBOT_NEWARTI: 'lingbot_newarti'}
+        if config.models.type not in targets:
+            raise ValueError('--image_profile is supported only for lingbot_ori and lingbot_newarti')
+        config.models[targets[config.models.type]]['image_profile'] = image_profile
 
     return config
 

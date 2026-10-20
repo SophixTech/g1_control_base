@@ -4,25 +4,65 @@
 
 ## 启动
 
-checkpoint 传输并解压完成后，`--model_path` 指向包含 `config.json`、`lingbotvla_cli.yaml` 和完整 `*.safetensors` 的目录，不是 ZIP 或训练中间状态目录：
+`--model_path` 指向包含 `config.json`、`lingbotvla_cli.yaml` 和完整 `*.safetensors` 的权重目录。`--norm_path` 必须使用该 checkpoint **训练时同一份统计文件**，不能仅凭数据集名称选择。ORI 适配器要求 `package_a2d`、50 步完整微调权重，不接受 ECOT 或 LoRA checkpoint。
+
+### 裁剪测试：10-18-cut0922
+
+先停止 Control 并退出占用端口的旧模型服务和旧客户端，再在两个终端分别启动。
+
+**终端 1：模型服务（开启实际推理裁剪）**
 
 ```bash
 cd /home/bjtc/Sophix/g1-open-rail
 scripts/run_lingbot_ori_server.sh \
-  --model_path /absolute/path/to/hf_ckpt \
-  --norm_path /home/bjtc/Sophix/datasets/mixed_conditioned_data/train_stats/norm_stats.json \
-  --chunk_size 50 --num_denoising_step 10
+  --model_path /home/bjtc/Sophix/ORI-lingbot-vla/trained-model/10-18-cut0922/hf_ckpt \
+  --norm_path /home/bjtc/Sophix/ORI-lingbot-vla/trained-model/10-18-cut0922/norm.json \
+  --chunk_size 50 \
+  --num_denoising_step 10 \
+  --image_profile crop_1016
 ```
 
-示例统计路径来自 ORI 的 `configs/vla/package_posttrain.yaml`；必须与实际 checkpoint 的训练数据一致。适配器要求 `package_a2d`、50 步完整微调权重，不接受 ECOT 或 LoRA checkpoint。原生 loader 使用 `strict=True` 加载。
+**终端 2：网页客户端（裁剪预览 + 右夹爪记录）**
 
 ```bash
-scripts/run_lingbot_ori_g1_client.sh --trace-joint 8
+cd /home/bjtc/Sophix/g1-open-rail
+scripts/run_lingbot_ori_g1_client.sh \
+  --preview-image-profile crop_1016 \
+  --trace-gripper right \
+  --trace-dir logs/gripper_traces
 ```
 
-打开 `http://127.0.0.1:9002`。客户端连接 Open-RAIL ZMQ 5566，复用可视化端口 8765。切换模型时停止占用这些端口的旧服务及旧客户端。初始化后先检查 Observe/Infer，再由操作者启用 Control。
+打开 **http://127.0.0.1:9002**。先启动 Observe 检查三路画面，再启动 Inference 检查推理；由操作者确认后启动 Control。Reset 使用 `conf/lingbot_ori_package.yaml` 的 Default 位姿，与图像裁剪参数独立。
 
-客户端复制本次提交时 ECOT 的实际参数：async、fitting 四次拟合、min_jerk、speed=0.8、wait_time=100 ms、控制周期 3.75 ms、推理超时 10000 ms。这些是沿用值，尚未针对 ORI 实测调优。数据保存在 `data/lingbot_ori_package`。
+| 参数 | 作用 |
+| --- | --- |
+| 服务端 `--image_profile crop_1016` | 裁剪真正送入模型的头部、左腕图像。 |
+| 客户端 `--preview-image-profile crop_1016` | 网页显示同样裁剪视野；仅处理显示副本，不改变推理传输，避免重复裁剪。 |
+| 客户端 `--trace-gripper right` | 记录右夹爪模型 chunk、处理后目标、SDK 下发值和原始反馈。 |
+
+**两个裁剪参数需要配对设置。网页显示裁剪画面，不代表服务端已经开启裁剪。**
+
+裁剪规则：头部 1280×800 先缩放为 768×480（已是该尺寸则跳过），再裁 `(x=200,y=0,w=480,h=480)`；左腕 848×480 裁 `(184,0,480,480)`。头部和左腕输出 224×224；右腕保持原图，后续仍经过模型自身的 resize。未知源尺寸会报错。网页预览经过额外 JPEG 编码，不保证与模型输入逐像素相同。客户端与服务端均需 Pillow，已列入项目依赖。
+
+夹爪日志保存在 `logs/gripper_traces/时间戳_会话编号/`。停止控制并退出客户端后，可导出：
+
+```bash
+python3 scripts/export_gripper_trace.py logs/gripper_traces/实际会话目录
+```
+
+不需要夹爪日志时去掉两个 `--trace-*` 参数。若改记手臂，可替换为 `--trace-joint 8`（右臂第 2 关节）；它与 `--trace-gripper` 互斥。
+
+### 不裁剪模式
+
+选择对应的训练权重及 norm，将服务端参数改为 `--image_profile original`，客户端参数改为 `--preview-image-profile original`；省略这两个参数也都默认为 `original`。切换后重启对应进程，以免沿用旧配置和动作缓存。
+
+客户端网页端口为 9002，模型 ZMQ 端口为 5566，可视化端口为 8765。如报 `address already in use`，先查占用进程并退出旧客户端：
+
+```bash
+ss -ltnp 'sport = :9002'
+```
+
+客户端运行参数以 `conf/lingbot_ori_package.yaml` 和网页当前设置为准，记录目录为 `data/lingbot_ori_package`。
 
 ## 指令选择
 

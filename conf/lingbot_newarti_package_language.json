@@ -1,6 +1,8 @@
 {
   "package_label_up": [
-    "Pick the soft package from the box and place it on the conveyor belt, keeping the label facing up."
+    "find the package",
+    "find the label of the packge",
+    "0"
   ],
   "package_label_down": [
     "Pick the soft package from the box, flip it so the label faces up, and place it on the conveyor belt."

@@ -182,6 +182,7 @@ def get_lingbot_ori_config():
     config.norm_path = ''
     config.chunk_size = 50
     config.num_denoising_step = 10
+    config.image_profile = 'original'
     return config
 
 
@@ -193,6 +194,7 @@ def get_lingbot_newarti_config():
     config.norm_path = ''
     config.chunk_size = 50
     config.num_denoising_step = 10
+    config.image_profile = 'original'
     return config
 
 

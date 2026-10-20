@@ -241,6 +241,8 @@ def main():
     events, warnings = read_events(args.session)
     if not events:
         parser.error('No trace events found')
+    if any(row.get('joint') == 15 for row in events):
+        parser.error('Gripper traces use raw feedback units; use export_gripper_trace.py instead')
     result = analyze(events, args.motion_threshold_rad)
     write_csv(args.session / 'commands.csv', result['rows'])
     write_csv(args.session / 'feedback.csv', result['feedback'])

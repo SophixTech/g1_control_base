@@ -108,7 +108,7 @@ class RobotBody(RobotBase):
 
     def _record_arm_feedback(self, arm, stamp):
         trace = self._joint_trace
-        if trace is None:
+        if trace is None or trace.joint == 15:
             return
         with self._trace_feedback_lock:
             if stamp == self._trace_feedback_stamp:
@@ -129,12 +129,40 @@ class RobotBody(RobotBase):
         if send_gripper:
             right = float(np.clip(action[15], 0.0, 1.0))
             right = right ** 4 / (right ** 4 + (1.0 - right) ** 4)
-            self.robot.move_gripper([self._left_gripper_hold, right])
+            self._send_gripper_command([self._left_gripper_hold, right], trace_context,
+                                       source='policy', input_target=float(action[15]))
             self.gripper_count = 0
+        elif self._joint_trace is not None and self._joint_trace.joint == 15:
+            self._joint_trace.record('gripper_skipped', **(trace_context or {}),
+                                     input_target=float(action[15]), reason='rate_divider')
         self.gripper_count += 1
+
+    def _send_gripper_command(self, positions, trace_context=None, source='manual', input_target=None):
+        trace = self._joint_trace
+        if trace is None or trace.joint != 15:
+            return self.robot.move_gripper(positions)
+        # The installed SDK normalizes values >1 in-place before publishing.
+        positions = list(positions)
+        requested = list(positions)
+        start = time.perf_counter_ns()
+        try:
+            self.robot.move_gripper(positions)
+        except Exception as exc:
+            trace.record('sdk_error', **(trace_context or {}), source=source,
+                         requested_positions=requested, input_target=input_target,
+                         send_start_ns=start, send_end_ns=time.perf_counter_ns(),
+                         error=f'{type(exc).__name__}: {exc}')
+            raise
+        else:
+            trace.record('sdk_command', **(trace_context or {}), source=source,
+                         q=float(positions[1]), requested_positions=requested,
+                         input_target=input_target, send_start_ns=start,
+                         send_end_ns=time.perf_counter_ns())
 
     def _send_arm_command(self, positions, trace_context=None, source='manual'):
         trace = self._joint_trace
+        if trace is not None and trace.joint == 15:
+            trace = None
         q = float(positions[trace.joint]) if trace else None
         send_start_ns = time.perf_counter_ns() if trace else None
         try:
@@ -159,7 +187,7 @@ class RobotBody(RobotBase):
         if 'arm' in data:
             self._send_arm_command(data['arm'])
         if 'gripper' in data:
-            self.robot.move_gripper(data['gripper'])
+            self._send_gripper_command(data['gripper'], source='manual_or_reset')
         if 'hand_as_gripper' in data:
             self.robot.move_hand_as_gripper(data['hand_as_gripper'])
         if 'head' in data:
@@ -204,9 +232,18 @@ class RobotBody(RobotBase):
             # Latest native feedback (not image-aligned state), including while
             # policy control is paused. No extra SDK read when tracing is off.
             if self._joint_trace is not None:
-                arm, stamp = self.robot.arm_joint_states()
-                if stamp and len(arm) == 14 and np.isfinite(arm).all():
-                    self._record_arm_feedback(arm, stamp)
+                if self._joint_trace.joint == 15:
+                    gripper, stamp = self.robot.gripper_states()
+                    if stamp and len(gripper) == 2 and all(v is not None for v in gripper) and np.isfinite(gripper).all():
+                        # SDK returns the LEFT timestamp for this pair, not the
+                        # right sample timestamp. Keep every PC read, no dedup.
+                        self._joint_trace.record('feedback', q=float(gripper[1]),
+                                                 sdk_pair_stamp_ns=int(stamp),
+                                                 stamp_source='left_gripper', units='raw')
+                else:
+                    arm, stamp = self.robot.arm_joint_states()
+                    if stamp and len(arm) == 14 and np.isfinite(arm).all():
+                        self._record_arm_feedback(arm, stamp)
             result = {'ref_timestamp': None, 'obs.state': None}
             result[f'cam.{self._cam_ref}'] = None
             for key, _ in self._non_ref_cameras:

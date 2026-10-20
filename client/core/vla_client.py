@@ -17,6 +17,7 @@ from client.utils.util import run_time_decorator
 from client.utils.multi_thread_timer import MultiThreadTimer
 from client.core.zmq_client import ZMQClient
 from client.core.joint_trace import JointTrace
+from server.models.lingbot_image_profile import ImageProfile
 from client.core.inter_chunk_fuser import InterChunkFuser
 from client.core.intra_chunk_smoother import IntraChunkSmoother
 from client.core.realtime_data_manager import RealtimeDataManager
@@ -115,6 +116,7 @@ class VLAClient():
         
         # Define image preprocess function
         self.update_preprocess_func()
+        self.preview_image_profile = ImageProfile(os.environ.get("OPEN_RAIL_PREVIEW_IMAGE_PROFILE", "original"))
 
         self.observe_thread = threading.Thread(target=self._observe_thread_fun, daemon=True)
         self.process_observe_thread = threading.Thread(target=self._process_observe_thread_fun, daemon=True)
@@ -515,7 +517,7 @@ class VLAClient():
                     source_time=decoded_observations.get('_worker_publish_time'),
                 ):
                     continue
-                self.visualize_server.update_image_data(encoded_imgs)
+                self.visualize_server.update_image_data(self._preview_images(encoded_imgs))
                 # record_data = self.shared_memory_manager.encode_observation(record_data)
 
                 if self.config.record.switch:
@@ -885,6 +887,26 @@ class VLAClient():
         else:
             self.logger.warning("No observe data, skip inference.")
 
+    def _preview_images(self, encoded_imgs):
+        """Crop display copies of transported frames; inference retains originals."""
+        profile = getattr(self, 'preview_image_profile', None)
+        if profile is None or profile.name == 'original':
+            return encoded_imgs
+        preview = dict(encoded_imgs)
+        for key in ('cam.head', 'cam.hand_left'):
+            if key not in encoded_imgs:
+                continue
+            frame = cv2.imdecode(np.frombuffer(encoded_imgs[key], dtype=np.uint8), cv2.IMREAD_COLOR)
+            if frame is None:
+                raise ValueError(f'Cannot decode preview image: {key}')
+            rgb = profile.apply(key, cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+            ok, encoded = cv2.imencode('.jpg', cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR),
+                                       [cv2.IMWRITE_JPEG_QUALITY, 95])
+            if not ok:
+                raise ValueError(f'Cannot encode preview image: {key}')
+            preview[key] = memoryview(encoded)
+        return preview
+
     def _process_image_thread_fun(self, key, value):
         """Process image data for inference transport while preserving raw frame for recorder.
 
@@ -1028,7 +1050,9 @@ class VLAClient():
                              model_path=server_status.get('model_path'),
                              observation_pc_s=float(loc_timestamp),
                              device_observation_stamp=int(ref_timestamp),
-                             observation_joint_rad=action_raw.get('_trace_observation_q'),
+                             observation_joint_rad=(action_raw.get('_trace_observation_q') if trace.joint < 14 else None),
+                             observation_value=action_raw.get('_trace_observation_q'),
+                             gripper_offset=int(getattr(self.config.controller, "gripper_offset", 0)),
                              raw_period_s=period, speed=float(self.config.controller.speed),
                              control_period_ms=float(self.config.controller.period),
                              rdm_mode=self.config.rdm.mode,

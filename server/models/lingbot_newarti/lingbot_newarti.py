@@ -11,6 +11,8 @@ import sys
 import numpy as np
 import yaml
 
+from server.models.lingbot_image_profile import ImageProfile
+
 
 class ModelVLA:
     CAMERA_KEYS = {
@@ -141,6 +143,7 @@ class ModelVLA:
 
     def __init__(self, config):
         self.cfg = config
+        self.image_profile = ImageProfile(config.get("image_profile", "original"))
         self.chunk_size = 50
         artifacts = self.validate_artifacts(config)
         repo = Path(artifacts['repo_path'])
@@ -201,7 +204,7 @@ class ModelVLA:
             frame = np.asarray(obs[source])
             if frame.ndim != 3 or frame.shape[2] != 3 or frame.dtype != np.uint8:
                 raise ValueError(f'{source} must be HxWx3 RGB uint8')
-            observation[target] = frame.copy()
+            observation[target] = self.image_profile.apply(source, frame)
         response = self.policy.infer(observation)
         actions = np.array(response['action'], dtype=np.float32, copy=True)
         if actions.shape != (50, 16) or not np.isfinite(actions).all():

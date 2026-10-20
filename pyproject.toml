@@ -26,6 +26,7 @@ dependencies = [
   "ml-collections==1.1.0",
   "numpy==1.26.4",
   "opencv-python==4.11.0.86",
+  "Pillow>=10.4.0",
   "pandas==2.2.3",
   "pyarrow==18.1.0",
   "PyYAML==6.0.3",

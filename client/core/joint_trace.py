@@ -10,8 +10,8 @@ from pathlib import Path
 
 class JointTrace:
     def __init__(self, directory, stream, joint, queue_size=4096):
-        if not 0 <= int(joint) < 14:
-            raise ValueError('Trace joint must be 0..13 (left 0..6, right 7..13)')
+        if int(joint) not in (*range(14), 15):
+            raise ValueError('Trace index must be 0..13 (arms) or 15 (right gripper)')
         self.joint = int(joint)
         self.directory = str(Path(directory).resolve())
         self.path = Path(self.directory) / f'{stream}.jsonl'
@@ -23,6 +23,8 @@ class JointTrace:
         self._thread = threading.Thread(target=self._write, daemon=True, name=f'trace-{stream}')
         self._thread.start()
         self.record('stream_start', schema_version=1, joint=self.joint, stream=stream,
+                    signal='right_gripper' if self.joint == 15 else 'arm_joint',
+                    units='SDK command 0..1; feedback raw' if self.joint == 15 else 'rad',
                     clock='PC perf_counter_ns; device stamps are a separate clock')
 
     def record(self, event, **fields):
