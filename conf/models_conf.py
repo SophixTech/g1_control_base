@@ -22,6 +22,7 @@ class ModelType(str, Enum):
     LINGBOT_ORI = 'lingbot_ori'
     LINGBOT_NEWARTI = 'lingbot_newarti'
     LINGBOT_V2 = 'lingbot_v2'
+    LINGBOT_ECOT_V2 = 'lingbot_ecot_v2'
 
 def get_mock_config():
     """Generate configuration for MOCK model.
@@ -210,6 +211,17 @@ def get_lingbot_v2_config():
     config.image_profile = 'original'
     return config
 
+def get_lingbot_ecot_v2_config():
+    """Independent Qwen2.5 ECOT label K/V deployment configuration."""
+    config = ConfigDict()
+    config.repo_path = str(Path(__file__).resolve().parents[2] / 'worktrees' / 'branch-ecot-v2')
+    config.model_path = ''
+    config.norm_path = ''
+    config.chunk_size = 50
+    config.num_denoising_step = 10
+    config.image_profile = 'original'
+    return config
+
 
 def get_models_config():
     """Generate configuration for all available VLA models.
@@ -243,4 +255,5 @@ def get_models_config():
     config.lingbot_ori = get_lingbot_ori_config()
     config.lingbot_newarti = get_lingbot_newarti_config()
     config.lingbot_v2 = get_lingbot_v2_config()
+    config.lingbot_ecot_v2 = get_lingbot_ecot_v2_config()
     return config
