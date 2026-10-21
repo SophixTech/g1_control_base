@@ -6,7 +6,7 @@
 
 `--model_path` 指向包含 `config.json`、`lingbotvla_cli.yaml` 和完整 `*.safetensors` 的权重目录。`--norm_path` 必须使用该 checkpoint **训练时同一份统计文件**，不能仅凭数据集名称选择。ORI 适配器要求 `package_a2d`、50 步完整微调权重，不接受 ECOT 或 LoRA checkpoint。
 
-### 裁剪测试：10-18-cut0922
+### 裁剪测试：10-18-cut0922/6whf_ckpt
 
 先停止 Control 并退出占用端口的旧模型服务和旧客户端，再在两个终端分别启动。
 
@@ -15,7 +15,7 @@
 ```bash
 cd /home/bjtc/Sophix/g1-open-rail
 scripts/run_lingbot_ori_server.sh \
-  --model_path /home/bjtc/Sophix/ORI-lingbot-vla/trained-model/10-18-cut0922/hf_ckpt \
+  --model_path /home/bjtc/Sophix/ORI-lingbot-vla/trained-model/10-18-cut0922/6whf_ckpt \
   --norm_path /home/bjtc/Sophix/ORI-lingbot-vla/trained-model/10-18-cut0922/norm.json \
   --chunk_size 50 \
   --num_denoising_step 10 \
@@ -54,7 +54,31 @@ python3 scripts/export_gripper_trace.py logs/gripper_traces/实际会话目录
 
 ### 不裁剪模式
 
-选择对应的训练权重及 norm，将服务端参数改为 `--image_profile original`，客户端参数改为 `--preview-image-profile original`；省略这两个参数也都默认为 `original`。切换后重启对应进程，以免沿用旧配置和动作缓存。
+以下使用同一份 `6whf_ckpt` 和训练 norm 做不裁剪对照；`original` 仅关闭额外 ROI 裁剪，模型自身 resize/归一化仍保留。切换前停止 Control 并退出旧模型服务和旧客户端，避免端口冲突或沿用旧动作缓存。
+
+**终端 1：模型服务（不裁剪）**
+
+```bash
+cd /home/bjtc/Sophix/g1-open-rail
+scripts/run_lingbot_ori_server.sh \
+  --model_path /home/bjtc/Sophix/ORI-lingbot-vla/trained-model/10-18-cut0922/6whf_ckpt \
+  --norm_path /home/bjtc/Sophix/ORI-lingbot-vla/trained-model/10-18-cut0922/norm.json \
+  --chunk_size 50 \
+  --num_denoising_step 10 \
+  --image_profile original
+```
+
+**终端 2：网页客户端（原图预览 + 右夹爪记录）**
+
+```bash
+cd /home/bjtc/Sophix/g1-open-rail
+scripts/run_lingbot_ori_g1_client.sh \
+  --preview-image-profile original \
+  --trace-gripper right \
+  --trace-dir logs/gripper_traces
+```
+
+同样打开 **http://127.0.0.1:9002**。两套命令任选一套，不能同时启动。若此权重使用裁剪图训练，不裁剪模式仅用于对照，不代表输入与训练一致。
 
 客户端网页端口为 9002，模型 ZMQ 端口为 5566，可视化端口为 8765。如报 `address already in use`，先查占用进程并退出旧客户端：
 

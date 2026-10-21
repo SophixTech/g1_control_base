@@ -21,6 +21,7 @@ class ModelType(str, Enum):
     LINGBOT_ECOT = 'lingbot_ecot'
     LINGBOT_ORI = 'lingbot_ori'
     LINGBOT_NEWARTI = 'lingbot_newarti'
+    LINGBOT_V2 = 'lingbot_v2'
 
 def get_mock_config():
     """Generate configuration for MOCK model.
@@ -198,6 +199,18 @@ def get_lingbot_newarti_config():
     return config
 
 
+def get_lingbot_v2_config():
+    """Independent Qwen3-VL V2 deployment configuration."""
+    config = ConfigDict()
+    config.repo_path = str(Path(__file__).resolve().parents[2] / 'ORI-lingbot-vlaV2')
+    config.model_path = ''
+    config.norm_path = ''
+    config.chunk_size = 50
+    config.num_denoising_step = 10
+    config.image_profile = 'original'
+    return config
+
+
 def get_models_config():
     """Generate configuration for all available VLA models.
     
@@ -229,4 +242,5 @@ def get_models_config():
     config.lingbot_ecot = get_lingbot_ecot_config()
     config.lingbot_ori = get_lingbot_ori_config()
     config.lingbot_newarti = get_lingbot_newarti_config()
+    config.lingbot_v2 = get_lingbot_v2_config()
     return config

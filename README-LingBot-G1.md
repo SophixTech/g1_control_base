@@ -74,6 +74,8 @@ scripts/run_lingbot_server.sh \
   --num_denoising_step "$DENOISING_STEPS"
 ```
 
+图像裁剪部署请使用支持 `--image_profile` 的 [ORI 入口](README-LingBot-ORI-G1.md)。
+
 | 参数 | 含义 / 替换要求 |
 |---|---|
 | `MODEL_PATH` | 模型权重目录，指向 `hf_ckpt` |

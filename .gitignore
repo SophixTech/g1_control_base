@@ -158,6 +158,7 @@ conf/*.yaml
 !conf/lingbot_ecot_package.yaml
 !conf/lingbot_ori_package.yaml
 !conf/lingbot_newarti_package.yaml
+!conf/lingbot_v2_package.yaml
 !config/default_conf.yaml
 *.svg
 

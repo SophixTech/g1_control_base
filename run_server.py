@@ -73,6 +73,9 @@ def get_model(config):
     elif config.type == ModelType.LINGBOT_NEWARTI:
         from server.models.lingbot_newarti import ModelVLA as LingBotNewarti
         return LingBotNewarti(config.lingbot_newarti)
+    elif config.type == ModelType.LINGBOT_V2:
+        from server.models.lingbot_v2 import ModelVLA as LingBotV2
+        return LingBotV2(config.lingbot_v2)
     else:
         raise ValueError("Invalid model type")
 
@@ -85,7 +88,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description='VLA Server')
     
     # Keep only the most commonly used parameters
-    parser.add_argument('--model_type', type=str, choices=['mock', 'act', 'gr00t_n1', 'gr00t_n1_5', 'gr00t_n1_6', 'rdt', 'smolvla','go1', 'pi0', 'pi05', 'tao', 'dm05', 'wallx', 'lingbot_vla', 'lingbot_ecot', 'lingbot_ori', 'lingbot_newarti'],
+    parser.add_argument('--model_type', type=str, choices=['mock', 'act', 'gr00t_n1', 'gr00t_n1_5', 'gr00t_n1_6', 'rdt', 'smolvla','go1', 'pi0', 'pi05', 'tao', 'dm05', 'wallx', 'lingbot_vla', 'lingbot_ecot', 'lingbot_ori', 'lingbot_newarti', 'lingbot_v2'],
                        help='Model type to use for inference')
     parser.add_argument('--model_path', type=str, help='Path to the model checkpoint')
     parser.add_argument('--repo_path', type=str, help='LingBot source repository')
@@ -94,7 +97,7 @@ def parse_args():
                         help='LingBot action horizon; must match the checkpoint')
     parser.add_argument('--num_denoising_step', type=int, help='LingBot denoising iterations')
     parser.add_argument('--image_profile', choices=['original', 'crop_1016'],
-                        help='ORI/NEWARTI camera preprocessing (default: original)')
+                        help='ORI/NEWARTI/V2 camera preprocessing (default: original)')
     parser.add_argument('--debug', action='store_true', help='Enable debug mode, disable Live interface')
     
     return parser.parse_args()
@@ -143,6 +146,8 @@ def override_config_with_args(config, args):
             config.models.lingbot_ori.model_path = args.model_path
         elif config.models.type == ModelType.LINGBOT_NEWARTI:
             config.models.lingbot_newarti.model_path = args.model_path
+        elif config.models.type == ModelType.LINGBOT_V2:
+            config.models.lingbot_v2.model_path = args.model_path
 
     if config.models.type == ModelType.LINGBOT_VLA:
         for key in ('repo_path', 'norm_path', 'chunk_size', 'num_denoising_step'):
@@ -173,12 +178,20 @@ def override_config_with_args(config, args):
                 config.models.lingbot_newarti[key] = value
         config.max_infer_workers = 1
 
+    if config.models.type == ModelType.LINGBOT_V2:
+        for key in ('repo_path', 'norm_path', 'chunk_size', 'num_denoising_step'):
+            value = getattr(args, key)
+            if value is not None:
+                config.models.lingbot_v2[key] = value
+        config.max_infer_workers = 1
+
     image_profile = getattr(args, 'image_profile', None)
     if image_profile is not None:
         targets = {ModelType.LINGBOT_ORI: 'lingbot_ori',
-                   ModelType.LINGBOT_NEWARTI: 'lingbot_newarti'}
+                   ModelType.LINGBOT_NEWARTI: 'lingbot_newarti',
+                   ModelType.LINGBOT_V2: 'lingbot_v2'}
         if config.models.type not in targets:
-            raise ValueError('--image_profile is supported only for lingbot_ori and lingbot_newarti')
+            raise ValueError('--image_profile is supported only for lingbot_ori, lingbot_newarti and lingbot_v2')
         config.models[targets[config.models.type]]['image_profile'] = image_profile
 
     return config
