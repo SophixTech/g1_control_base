@@ -1343,7 +1343,7 @@ async function applyVisualConfig(cfg = App.config) {
   } else if (jointTokens.length > 0) {
     const labels = getTrajJointLabels();
     const labelToIndex = new Map(labels.map((name, idx) => [String(name).toLowerCase(), idx]));
-    const split = Math.ceil(getTrajJointCount() / 2);
+    const split = Math.ceil((App.traj.armJointCount ?? getTrajJointCount()) / 2);
     const joints = jointTokens
       .map(v => {
         if (typeof v === 'number') return v;

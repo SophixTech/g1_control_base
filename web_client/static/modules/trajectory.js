@@ -6,7 +6,7 @@
 //  Zoom/pan via chartjs-plugin-zoom.
 // ═══════════════════════════════════════════════════════
 
-// Default labels; runtime labels are derived from the active robot action_layout.arm.
+// Default labels; runtime labels include arms and two scalar grippers from action_layout.
 const TRAJ_DEFAULT_JOINT_LABELS = [
   'L0','L1','L2','L3','L4','L5','L6',
   'R0','R1','R2','R3','R4','R5','R6',
@@ -114,18 +114,34 @@ function _makeTrajJointLabels(count) {
 function syncTrajLayoutFromConfig(cfg = App.config, fallbackCount = TRAJ_JOINT_COUNT) {
   const t = App.traj;
   const seg = resolveTrajActionSegment(cfg, fallbackCount);
-  const count = Math.max(0, seg.end - seg.start);
-  const changed = t.actionStart !== seg.start || t.actionEnd !== seg.end || t.actionName !== seg.name || t.numJoints !== count;
-
+  const armCount = Math.max(0, seg.end - seg.start);
+  const labels = _makeTrajJointLabels(armCount);
+  const channels = labels.map((label, i) => ({
+    index: seg.start + i, label, kind: 'arm',
+    side: i < Math.ceil(armCount / 2) ? 'left' : 'right',
+  }));
+  const gripper = _normalizeActionSegment(_resolveCurrentActionLayout(cfg)?.gripper);
+  // Two scalar grippers; multi-joint dexterous hands are not a gripper pair.
+  if (gripper && gripper.end - gripper.start === 2 &&
+      (gripper.start >= seg.end || gripper.end <= seg.start)) {
+    channels.push(
+      { index: gripper.start, label: '左夹爪', kind: 'gripper', side: 'left' },
+      { index: gripper.start + 1, label: '右夹爪', kind: 'gripper', side: 'right' },
+    );
+  }
+  const changed = JSON.stringify(t.channels) !== JSON.stringify(channels);
   t.actionStart = seg.start;
   t.actionEnd = seg.end;
   t.actionName = seg.name;
-  t.numJoints = count;
-  t.jointLabels = _makeTrajJointLabels(count);
-
-  // const kept = new Set([...t.selectedJoints].filter(i => Number.isInteger(i) && i >= 0 && i < count));
-  // t.selectedJoints = t.jointSelectionInitialized ? kept : _defaultSelectedJoints(count);
-  // t.jointSelectionInitialized = true;
+  t.armJointCount = armCount;
+  t.channels = channels;
+  t.numJoints = channels.length;
+  t.jointLabels = channels.map(channel => channel.label);
+  t.selectedJoints = new Set([...t.selectedJoints].filter(i => i >= 0 && i < channels.length));
+  // Existing buffers use channel positions, so discard them if the layout changes.
+  if (changed && t.buffer) {
+    Object.values(t.buffer).forEach(buffer => { buffer.length = 0; });
+  }
 
   if (changed) renderJointSelector();
   return changed;
@@ -134,11 +150,10 @@ function syncTrajLayoutFromConfig(cfg = App.config, fallbackCount = TRAJ_JOINT_C
 function _sliceTrajArray(arr) {
   if (!Array.isArray(arr) || arr.length === 0) return [];
   syncTrajLayoutFromConfig(App.config, arr.length);
-  const { actionStart, actionEnd, numJoints } = App.traj;
-  if (Number.isInteger(actionStart) && Number.isInteger(actionEnd) && arr.length >= actionEnd) {
-    return arr.slice(actionStart, actionEnd);
-  }
-  return arr.slice(0, Math.min(arr.length, numJoints || arr.length));
+  return App.traj.channels.map(channel => {
+    const value = arr[channel.index];
+    return Number.isFinite(value) ? value : null;
+  });
 }
 
 /* ── Create the single unified Chart.js instance ── */
@@ -156,6 +171,12 @@ function createUnifiedChart() {
       animation: false,
       parsing: false,
       scales: {
+        gripper: {
+          type: 'linear', position: 'right', display: false,
+          title: { display: true, text: '夹爪值', color: '#656d76', font: { size: 9 } },
+          grid: { drawOnChartArea: false },
+          ticks: { maxTicksLimit: 6, color: '#656d76', font: { size: 9 } },
+        },
         x: {
           type: 'linear',
           title: { display: false },
@@ -217,7 +238,7 @@ function createUnifiedChart() {
   });
 }
 
-/* ── Build joint selector chips from active robot action_layout.arm ── */
+/* ── Build arm and gripper selector chips from the robot layout ── */
 function buildJointSelector(numJoints) {
   syncTrajLayoutFromConfig(App.config, numJoints || TRAJ_JOINT_COUNT);
 }
@@ -243,6 +264,9 @@ async function renderJointSelector() {
     const color = getTrajJointColor(i);
     chip.className = 'joint-sel-chip' + (t.selectedJoints.has(i) ? ' active' : '');
     chip.textContent = labels[i] ?? `J${i}`;
+    if (t.channels?.[i]?.kind === 'gripper') {
+      chip.title = 'State：反馈值；ActionRaw：模型原始目标；ActionFitted：平滑后目标（尚未经过硬件夹爪映射）';
+    }
     chip.dataset.idx = i;
     _applyChipColor(chip, t.selectedJoints.has(i), color);
     chip.addEventListener('click', async () => {
@@ -274,7 +298,7 @@ async function renderJointSelector() {
       }
       // console.log('selectedJoints:', t.selectedJoints);
     });
-    if (i < split) {
+    if ((t.channels?.[i]?.side || (i < split ? 'left' : 'right')) === 'left') {
       rowL.insertBefore(chip, btnAll);   // insert before All
     } else {
       rowR.insertBefore(chip, btnNone);  // insert before None
@@ -410,6 +434,8 @@ function refreshUnifiedChart() {
   let yMax = Number.NEGATIVE_INFINITY;
 
   const sorted = [...t.selectedJoints].sort((a, b) => a - b);
+  t.chart.options.scales.gripper.display = src.size > 0 &&
+    sorted.some(i => t.channels?.[i]?.kind === 'gripper');
   if (sorted.length === 0 || src.size === 0) {
     t.chart.data.datasets = [];
     t.chart.update('none');
@@ -423,6 +449,7 @@ function refreshUnifiedChart() {
   for (const jointIdx of sorted) {
     const color  = getTrajJointColor(jointIdx);
     const label  = labels[jointIdx] ?? `J${jointIdx}`;
+    const yAxisID = t.channels?.[jointIdx]?.kind === 'gripper' ? 'gripper' : 'y';
     const alpha  = color.replace('rgb(', 'rgba(').replace(')', ', 0.08)');
 
     if (src.has('state')) {
@@ -430,6 +457,7 @@ function refreshUnifiedChart() {
       datasets.push({
         label: label + (showSuffix ? ' (S)' : ''),
         data,
+        yAxisID,
         borderColor: color,
         backgroundColor: alpha,
         borderWidth: 1.5,
@@ -439,7 +467,7 @@ function refreshUnifiedChart() {
       });
       for (let i = 0, len = data.length; i < len; i += 1) {
         const y = data[i].y;
-        if (Number.isFinite(y)) {
+        if (yAxisID === 'y' && Number.isFinite(y)) {
           if (y < yMin) yMin = y;
           if (y > yMax) yMax = y;
         }
@@ -451,6 +479,7 @@ function refreshUnifiedChart() {
       datasets.push({
         label: label + (showSuffix ? ' (AF)' : ''),
         data,
+        yAxisID,
         borderColor: color,
         backgroundColor: alpha,
         borderWidth: 1.5,
@@ -460,7 +489,7 @@ function refreshUnifiedChart() {
       });
       for (let i = 0, len = data.length; i < len; i += 1) {
         const y = data[i].y;
-        if (Number.isFinite(y)) {
+        if (yAxisID === 'y' && Number.isFinite(y)) {
           if (y < yMin) yMin = y;
           if (y > yMax) yMax = y;
         }
@@ -472,6 +501,7 @@ function refreshUnifiedChart() {
       datasets.push({
         label: label + (showSuffix ? ' (AR)' : ''),
         data,
+        yAxisID,
         borderColor: color,
         backgroundColor: alpha,
         borderWidth: 1.5,
@@ -481,7 +511,7 @@ function refreshUnifiedChart() {
       });
       for (let i = 0, len = data.length; i < len; i += 1) {
         const y = data[i].y;
-        if (Number.isFinite(y)) {
+        if (yAxisID === 'y' && Number.isFinite(y)) {
           if (y < yMin) yMin = y;
           if (y > yMax) yMax = y;
         }
