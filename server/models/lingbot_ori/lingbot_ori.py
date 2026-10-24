@@ -10,6 +10,7 @@ import sys
 
 import numpy as np
 import yaml
+from PIL import Image
 
 from server.models.lingbot_image_profile import ImageProfile
 
@@ -143,6 +144,10 @@ class ModelVLA:
                 self.global_step = 0
                 self.last_action_chunk = None
                 data_config = copy.copy(self.data_config)
+                for key in ('image_mask_enabled', 'image_mask_path', 'image_mask_camera'):
+                    value = config.get(key)
+                    if value is not None:
+                        setattr(data_config, key, value)
                 if getattr(data_config, 'joints', None) is not None:
                     # CLI exports may serialize these mappings as strings;
                     # hand-written YAML keeps dictionaries. Native expects strings.
@@ -153,6 +158,18 @@ class ModelVLA:
                     self.language_tokenizer, self.processor.image_processor,
                     chunk_size=self.config.chunk_size, norm_stats_path=self.robot_norm_path,
                 )
+                native_mask = getattr(self.vla.feature_transform, 'raw_image_mask', None)
+                if getattr(data_config, 'image_mask_enabled', False) and native_mask is None:
+                    raise ValueError('This ORI checkout does not support image masking; update ORI source')
+                # Apply the native mask once, before OpenRAIL ROI cropping.
+                self.openrail_image_mask = copy.copy(native_mask)
+                if native_mask is not None:
+                    native_mask.enabled = False
+                logging.getLogger(__name__).info(
+                    'ORI image mask: enabled=%s camera=%s path=%s',
+                    getattr(self.openrail_image_mask, 'enabled', False),
+                    getattr(data_config, 'image_mask_camera', 'observation.images.cam_high_rgb'),
+                    getattr(data_config, 'image_mask_path', None))
 
         # Native ORI loader loads full weights with strict=True; no rtc_mode argument.
         self.policy = ORIPolicy(
@@ -163,6 +180,16 @@ class ModelVLA:
         self.policy.reset('package_a2d')
         if self.policy.config.chunk_size != 50 or self.policy.vla.feature_transform.chunk_size != 50:
             raise ValueError('Loaded ORI policy/FeatureTransform must have chunk_size=50')
+
+    def preprocess_image(self, source, target, frame):
+        mask = getattr(self.policy, 'openrail_image_mask', None)
+        if mask is not None and mask.enabled and target == mask.camera:
+            # The G1 head stream and data-v1 training frames share a 16:10 canvas.
+            # Only this known full-frame resize is allowed; never stretch arbitrary masks.
+            if source == 'cam.head' and frame.shape[:2] == (800, 1280) and mask.keep.shape == (480, 768):
+                frame = np.array(Image.fromarray(frame).resize((768, 480), Image.Resampling.LANCZOS))
+            frame = mask.apply(frame, target, channels_last=True)
+        return self.image_profile.apply(source, frame)
 
     def infer(self, sequence):
         if len(sequence) != 1:
@@ -181,7 +208,7 @@ class ModelVLA:
             frame = np.asarray(obs[source])
             if frame.ndim != 3 or frame.shape[2] != 3 or frame.dtype != np.uint8:
                 raise ValueError(f'{source} must be HxWx3 RGB uint8')
-            observation[target] = self.image_profile.apply(source, frame)
+            observation[target] = self.preprocess_image(source, target, frame)
         response = self.policy.infer(observation)
         actions = np.array(response['action'], dtype=np.float32, copy=True)
         if actions.shape != (50, 16) or not np.isfinite(actions).all():

@@ -101,6 +101,12 @@ def parse_args():
     parser.add_argument('--num_denoising_step', type=int, help='LingBot denoising iterations')
     parser.add_argument('--image_profile', choices=['original', 'crop_1016'],
                         help='ORI/NEWARTI/V2/ECOT-V2 camera preprocessing (default: original)')
+    parser.add_argument('--image-mask-enabled', action=argparse.BooleanOptionalAction, default=None,
+                        help='ORI: override checkpoint mask on/off')
+    parser.add_argument('--image-mask-path', default=None, help='ORI: mask PNG or row-interval JSON')
+    parser.add_argument('--image-mask-camera', choices=['observation.images.cam_high_rgb',
+                        'observation.images.cam_left_wrist_rgb', 'observation.images.cam_right_wrist_rgb'],
+                        default=None, help='ORI: raw camera feature to mask')
     parser.add_argument('--debug', action='store_true', help='Enable debug mode, disable Live interface')
     
     return parser.parse_args()
@@ -196,6 +202,13 @@ def override_config_with_args(config, args):
             if value is not None:
                 config.models.lingbot_ecot_v2[key] = value
         config.max_infer_workers = 1
+
+    for key in ('image_mask_enabled', 'image_mask_path', 'image_mask_camera'):
+        value = getattr(args, key, None)
+        if value is not None:
+            if config.models.type != ModelType.LINGBOT_ORI:
+                raise ValueError('Image mask options are supported only for lingbot_ori')
+            config.models.lingbot_ori[key] = value
 
     image_profile = getattr(args, 'image_profile', None)
     if image_profile is not None:

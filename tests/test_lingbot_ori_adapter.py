@@ -250,3 +250,91 @@ def test_real_saved_observation_matches_native():
     for key in obs:
         np.testing.assert_array_equal(obs[key], original['obs'][key])
     assert result['ref_timestamp'] == source['ref_timestamp']
+
+
+@pytest.fixture
+def native_mask_case(case, monkeypatch):
+    """Use the actual ORI mask implementation with the lightweight policy fixture."""
+    import importlib.util
+    repo = Path(__file__).resolve().parents[2] / 'ORI-lingbot-vla'
+    file = repo / 'lingbotvla/data/vla_data/image_mask.py'
+    if not file.exists():
+        pytest.skip('Updated ORI mask implementation is not installed')
+    spec = importlib.util.spec_from_file_location('ori_mask_test', file)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    policy_module = sys.modules[ModelVLA.MODULE]
+    original_init = policy_module.LingbotVLAServer.__init__
+    def init(self, *args, **kwargs):
+        original_init(self, *args, **kwargs)
+        for key in ('image_mask_enabled', 'image_mask_path', 'image_mask_camera'):
+            if key in case.training['data']:
+                setattr(self.data_config, key, case.training['data'][key])
+    monkeypatch.setattr(policy_module.LingbotVLAServer, '__init__', init)
+    original_transform = policy_module.FeatureTransform
+    def transform(path, data, *args, **kwargs):
+        value = original_transform(path, data, *args, **kwargs)
+        value.raw_image_mask = module.RawImageMask(data)
+        return value
+    monkeypatch.setattr(policy_module, 'FeatureTransform', transform)
+    from PIL import Image
+    mask_file = case.checkpoint / 'mask.png'
+    pixels = np.zeros((480, 768), dtype=np.uint8)
+    pixels[:, 384:] = 255
+    Image.fromarray(pixels).save(mask_file)
+    case.training['data'].update(image_mask_enabled=True, image_mask_path=str(mask_file),
+                                 image_mask_camera='observation.images.cam_high_rgb')
+    return case
+
+
+def test_mask_inherited_and_applied_once_before_crop(native_mask_case):
+    case = native_mask_case
+    model = ModelVLA(case.config)
+    assert model.policy.openrail_image_mask.enabled
+    assert not model.policy.vla.feature_transform.raw_image_mask.enabled
+    frame = np.full((800, 1280, 3), 200, dtype=np.uint8)
+    result = model.preprocess_image('cam.head', ModelVLA.CAMERA_KEYS['cam.head'], frame)
+    assert result.shape == (480, 768, 3)
+    assert np.all(result[:, :384] == 0) and np.all(result[:, 384:] == 200)
+    assert np.all(frame == 200)
+    wrist = np.full((480, 848, 3), 90, dtype=np.uint8)
+    np.testing.assert_array_equal(model.preprocess_image('cam.hand_left', ModelVLA.CAMERA_KEYS['cam.hand_left'], wrist), wrist)
+    from server.models.lingbot_image_profile import ImageProfile
+    model.image_profile = ImageProfile('crop_1016')
+    cropped = model.preprocess_image('cam.head', ModelVLA.CAMERA_KEYS['cam.head'], frame)
+    np.testing.assert_array_equal(cropped, model.image_profile.apply('cam.head', result))
+    with pytest.raises(ValueError, match='original resolution'):
+        model.preprocess_image('cam.head', ModelVLA.CAMERA_KEYS['cam.head'], np.zeros((240,320,3),dtype=np.uint8))
+
+
+def test_mask_can_be_explicitly_disabled(native_mask_case):
+    case = native_mask_case
+    case.config['image_mask_enabled'] = False
+    case.config['image_mask_path'] = '/nonexistent/mask.png'
+    model = ModelVLA(case.config)
+    frame = np.full((800,1280,3), 123, dtype=np.uint8)
+    np.testing.assert_array_equal(model.preprocess_image('cam.head', ModelVLA.CAMERA_KEYS['cam.head'], frame), frame)
+
+
+def test_mask_explicit_enable_and_bad_path(native_mask_case):
+    case = native_mask_case
+    case.training['data']['image_mask_enabled'] = False
+    case.config['image_mask_enabled'] = True
+    assert ModelVLA(case.config).policy.openrail_image_mask.enabled
+    case.config['image_mask_path'] = '/nonexistent/mask.png'
+    with pytest.raises(FileNotFoundError):
+        ModelVLA(case.config)
+
+
+def test_mask_cli_override_and_model_isolation(monkeypatch):
+    from conf.server_conf import get_vla_server_config
+    from run_server import override_config_with_args, parse_args
+    for flag, expected in [('--image-mask-enabled', True), ('--no-image-mask-enabled', False)]:
+        monkeypatch.setattr(sys, 'argv', ['run_server.py','--model_type','lingbot_ori',flag,
+                                         '--image-mask-path','mask/data-v1/union_mask.png'])
+        config = override_config_with_args(get_vla_server_config(), parse_args())
+        assert config.models.lingbot_ori.image_mask_enabled is expected
+        assert config.models.lingbot_ori.image_mask_path == 'mask/data-v1/union_mask.png'
+    monkeypatch.setattr(sys,'argv',['run_server.py','--model_type','lingbot_ecot','--image-mask-enabled'])
+    with pytest.raises(ValueError, match='only for lingbot_ori'):
+        override_config_with_args(get_vla_server_config(), parse_args())

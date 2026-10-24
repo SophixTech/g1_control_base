@@ -45,7 +45,7 @@ class RobotBody(RobotBase):
         self._gripper_vmax = 120.0
 
         self.gripper_count = 0
-        self._left_gripper_hold = None
+        self._policy_control_ready = False
         self._joint_trace = None
         self._trace_feedback_lock = threading.Lock()
         self._trace_feedback_stamp = None
@@ -88,17 +88,16 @@ class RobotBody(RobotBase):
                 raise RuntimeError(f'whole_body_status {key}=false')
 
     def prepare_policy_control(self):
-        """Sample the left gripper hold target without publishing any commands."""
-        self._left_gripper_hold = None
+        """Validate fresh feedback before enabling policy commands."""
+        self._policy_control_ready = False
         self._check_live_status()
         feedback, stamp = self.robot.gripper_states()
         self._check_fresh(stamp, 'gripper state')
         feedback = np.asarray(feedback, dtype=float)
         if feedback.shape != (2,) or not np.isfinite(feedback).all():
             raise RuntimeError('gripper state must contain 2 finite values')
-        # Match G's raw/120 hold conversion; do not apply the right-gripper curve.
-        self._left_gripper_hold = float(np.clip(feedback[0] / 120.0, 0.0, 1.0))
         self.gripper_count = 0
+        self._policy_control_ready = True
 
     def configure_joint_trace(self, directory, joint):
         if self._joint_trace is not None:
@@ -117,19 +116,20 @@ class RobotBody(RobotBase):
             trace.record('feedback', device_stamp_ns=int(stamp), q=float(arm[trace.joint]))
 
     def control_robot(self, action, trace_context=None):
-        """Execute a 16-D policy target: absolute arms, held left gripper, curved right."""
+        """Execute absolute arms, direct left gripper and curved right gripper."""
         action = np.asarray(action, dtype=float)
         if action.shape != (16,) or not np.isfinite(action).all():
             raise ValueError('G1 policy action must contain 16 finite values')
-        if self._left_gripper_hold is None:
+        if not self._policy_control_ready:
             raise RuntimeError('Call prepare_policy_control() before enabling G1 policy control')
         send_gripper = self.gripper_count % self.config['gripper_freq'] == 0
         self._check_live_status()
         self._send_arm_command(action[:14].tolist(), trace_context, source='policy')
         if send_gripper:
+            left = float(np.clip(action[14], 0.0, 1.0))
             right = float(np.clip(action[15], 0.0, 1.0))
             right = right ** 4 / (right ** 4 + (1.0 - right) ** 4)
-            self._send_gripper_command([self._left_gripper_hold, right], trace_context,
+            self._send_gripper_command([left, right], trace_context,
                                        source='policy', input_target=float(action[15]))
             self.gripper_count = 0
         elif self._joint_trace is not None and self._joint_trace.joint == 15:

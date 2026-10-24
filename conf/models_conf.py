@@ -185,6 +185,9 @@ def get_lingbot_ori_config():
     config.chunk_size = 50
     config.num_denoising_step = 10
     config.image_profile = 'original'
+    config.image_mask_enabled = None  # Inherit checkpoint unless explicitly overridden.
+    config.image_mask_path = None
+    config.image_mask_camera = None
     return config
 
 

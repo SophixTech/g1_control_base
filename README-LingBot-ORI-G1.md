@@ -15,12 +15,18 @@
 ```bash
 cd /home/bjtc/Sophix/g1-open-rail
 scripts/run_lingbot_ori_server.sh \
-  --model_path /home/bjtc/Sophix/ORI-lingbot-vla/trained-model/10-18-cut0922/6whf_ckpt \
+  --model_path /home/bjtc/Sophix/ORI-lingbot-vla/trained-model/Cmet/10-21-data1019-sidepick/hf_ckpt \
   --norm_path /home/bjtc/Sophix/ORI-lingbot-vla/trained-model/10-18-cut0922/norm.json \
   --chunk_size 50 \
   --num_denoising_step 10 \
   --image_profile crop_1016
 ```
+
+scripts/run_lingbot_ori_server.sh \
+  --model_path /home/bjtc/Sophix/ORI-lingbot-vla/trained-model/Cmet/10-21-data1019-sidepick/hf_ckpt \
+  --norm_path /home/bjtc/Sophix/ORI-lingbot-vla/trained-model/Cmet/10-21-data1019-sidepick/norm.json \
+  --chunk_size 50 \
+  --num_denoising_step 10 \
 
 **终端 2：网页客户端（裁剪预览 + 右夹爪记录）**
 
@@ -140,3 +146,61 @@ ORI_TEST_OBSERVATION_DIR=/absolute/path/to/saved_episode \
 ```
 
 该测试检查严格加载、有限动作、相同随机种子下适配与原生 infer 的输出一致及输入未被修改。完成后再评估推理耗时与真机轨迹。
+
+## 可选图像 Mask（2026-10-22）
+
+ORI 新增固定二值遮罩：白色保留原图，黑色区域置黑。它与 `crop_1016` ROI 裁剪是独立功能。目前仅 `lingbot_ori` 支持以下参数：
+
+| 参数 | 作用 |
+|---|---|
+| 不指定 mask 开关 | 继承 checkpoint 内 `lingbotvla_cli.yaml` 的 `data.image_mask_enabled`；未配置则关闭 |
+| `--image-mask-enabled` | 强制开启 |
+| `--no-image-mask-enabled` | 强制关闭，即使训练配置开启 |
+| `--image-mask-path` | PNG 或逐行区间 JSON；仅指定路径不会自动开启 |
+| `--image-mask-camera` | 原始相机字段，默认 `observation.images.cam_high_rgb` |
+
+相对 mask 路径以 **ORI 源码目录**为基准。更换机器时一起复制训练使用的 mask；可用命令行覆盖 checkpoint 中原机器的绝对路径。老版本 ORI 源码不支持启用此功能。
+
+### 开启 Mask，不裁剪
+
+替换为本次训练实际使用的 checkpoint 和 norm：
+
+```bash
+cd /home/bjtc/Sophix/g1-open-rail
+scripts/run_lingbot_ori_server.sh \
+  --model_path /实际训练输出/hf_ckpt \
+  --norm_path /该次训练使用的/norm.json \
+  --chunk_size 50 --num_denoising_step 10 \
+  --image_profile original \
+  --image-mask-enabled \
+  --image-mask-path /home/bjtc/Sophix/ORI-lingbot-vla/mask/data-v1/union_mask.png \
+  --image-mask-camera observation.images.cam_high_rgb
+```
+
+客户端另一个终端启动：
+
+```bash
+cd /home/bjtc/Sophix/g1-open-rail
+scripts/run_lingbot_ori_g1_client.sh --preview-image-profile original
+```
+
+### 关闭 Mask
+
+```bash
+scripts/run_lingbot_ori_server.sh \
+  --model_path /实际训练输出/hf_ckpt \
+  --norm_path /该次训练使用的/norm.json \
+  --chunk_size 50 --num_denoising_step 10 \
+  --image_profile original \
+  --no-image-mask-enabled
+```
+
+### 分辨率、裁剪和预览
+
+仓库提供的 `data-v1/union_mask.png` 为 768×480，来自侧抓训练数据。头部实时图若为 1280×800，OpenRAIL 先用 LANCZOS 等比例缩放至 768×480，再调用 ORI 原生 mask；原本 768×480 的输入直接遮罩。其他尺寸不匹配会报错，不会任意拉伸 mask。等比例缩放不保证相机视野或标定一致，mask 应与训练视角一致。
+
+处理顺序为：**全幅尺寸对齐 → 原生 mask → 可选 `crop_1016` → 模型原生 resize/归一化**。只执行一次 mask。若训练也包含同样的 ROI 裁剪，可将服务参数改为 `--image_profile crop_1016`；不要把“mask 训练”直接当作“裁剪训练”。默认只处理头部，腕部不做遮罩。
+
+**网页预览目前不显示 mask**，`--preview-image-profile` 仍只控制原图/裁剪预览。mask 是模型服务端功能，客户端继续发送原始观测。服务启动日志会输出 mask 开关、相机和路径；改变参数后重启模型服务。
+
+离线测试覆盖显式开关、checkpoint 配置继承、实际 ORI mask 的像素结果、768×480 尺寸对齐、腕部不受头部 mask 影响、组合裁剪和防止重复遮罩。本次未加载真实 mask 训练权重或下发实机动作。
