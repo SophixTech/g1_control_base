@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import threading
 from concurrent.futures import ThreadPoolExecutor
-from a2d_sdk.robot import RobotDds as Robot
+from .sdk_robot import Robot
 from a2d_sdk.robot import CosineCamera as Camera
 from ..base_robot import RobotBase
 from client.core.joint_trace import JointTrace

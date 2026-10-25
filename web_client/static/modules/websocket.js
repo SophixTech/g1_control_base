@@ -100,14 +100,16 @@ function handleWSMessage(msg) {
     case 'stats':  renderStats(msg.data); break;
     case 'status':
       if (msg?.data) {
+        if (msg.data.conveyor_gate) App.conveyorEnabled = !!msg.data.conveyor_gate.enabled;
         if (typeof msg.data.observe_running === 'boolean') App.isObserveRunning = msg.data.observe_running;
         if (typeof msg.data.inference_running === 'boolean') App.isInferenceRunning = msg.data.inference_running;
-        if (typeof msg.data.control_running === 'boolean') App.isControlRunning = msg.data.control_running;
+        if (typeof msg.data.control_running === 'boolean') App.isControlRunning = msg.data.control_requested ?? msg.data.control_running;
       }
       toast(msg.data?.message, msg.data?.running || msg.data?.paused ? 'ok' : 'warn');
       setRunningUI(msg.data.running, msg.data.paused ?? false);
       break;
     case 'error':  toast(msg.data.message, 'error'); setRunningUI(false, false); break;
+    case 'conveyor_error': toast(msg.data.message, 'error'); break;
     case 'pong':   break;
   }
 }

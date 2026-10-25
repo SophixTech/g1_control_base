@@ -2,9 +2,10 @@
 //  Stats rendering
 // ═══════════════════════════════════════════════════════
 function renderStats(data) {
+  if (data?.conveyor_gate) App.conveyorEnabled = !!data.conveyor_gate.enabled;
   App.isObserveRunning = !!(data?.observe_running ?? (data?.running && !data?.paused));
   App.isInferenceRunning = !!(data?.inference_running ?? (data?.running && !data?.paused));
-  App.isControlRunning = !!(data?.control_running ?? (data?.running && !data?.paused));
+  App.isControlRunning = !!(data?.control_requested ?? data?.control_running ?? (data?.running && !data?.paused));
   setRunningUI(data.running, data.paused ?? false);
 
   $('val-obv-fps').textContent = data.obv_fps != null
@@ -213,6 +214,11 @@ async function renderSubTask(subTaskId = null) {
  *   Running (active) |  Stop      |  Pause       |  ✓
  *   Running (paused) |  Stop      |  Resume      |  ✓
  */
+function canToggleControl() {
+  return !!App.isControlRunning || (!!App.isRunning && !!App.isObserveRunning &&
+    (!!App.isInferenceRunning || !!App.conveyorEnabled));
+}
+
 function setThreadControlUI() {
   const btnObserve = $('btn-observe');
   const btnInfer = $('btn-infer');
@@ -226,7 +232,7 @@ function setThreadControlUI() {
 
   btnObserve.disabled = false;
   btnInfer.disabled = !running || !observeRunning;
-  btnControl.disabled = !running || !observeRunning || !inferenceRunning;
+  btnControl.disabled = !canToggleControl();
 
   btnObserve.className = `btn btn-xs${observeRunning ? ' btn-active' : ''}`;
   btnInfer.className = `btn btn-xs${inferenceRunning ? ' btn-active' : ''}`;
@@ -243,9 +249,10 @@ function setThreadControlUI() {
 
 function applyThreadState(data) {
   if (!data) return;
+  if (data.conveyor_gate) App.conveyorEnabled = !!data.conveyor_gate.enabled;
   if (typeof data.observe_running === 'boolean') App.isObserveRunning = data.observe_running;
   if (typeof data.inference_running === 'boolean') App.isInferenceRunning = data.inference_running;
-  if (typeof data.control_running === 'boolean') App.isControlRunning = data.control_running;
+  if (typeof data.control_running === 'boolean') App.isControlRunning = data.control_requested ?? data.control_running;
 }
 
 function syncStartPauseButtons(running, paused = false) {
@@ -736,7 +743,7 @@ async function wireEvents() {
 
   $('btn-control').addEventListener('click', async () => {
     const btnControl = $('btn-control');
-    if (!btnControl || !App.isObserveRunning || !App.isInferenceRunning) return;
+    if (!btnControl || !canToggleControl()) return;
 
     const controller = beginFetchRequest();
 

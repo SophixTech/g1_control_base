@@ -33,6 +33,8 @@ def get_client_config():
     config.visualize = get_visualize_config()
     config.record = get_record_data_config()  # Data recording configuration
     config.vision = get_vision_config()
+    from client.core.conveyor_gate import DEFAULTS
+    config.vision.conveyor_gate = ConfigDict(DEFAULTS)
     config.language = get_language_config()
     return config
 

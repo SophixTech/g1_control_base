@@ -243,9 +243,13 @@ class _RobotWorker:
             return
         _, cmd_id, method, args, kwargs = command
         try:
-            target = getattr(self._robot, method)
             with self._robot_command_lock:
-                result = target(*args, **kwargs)
+                if method == 'check_control_health':
+                    if self._control_failed.is_set():
+                        raise RuntimeError('Robot control worker is faulted; restart the client before enabling automatic control')
+                    result = True
+                else:
+                    result = getattr(self._robot, method)(*args, **kwargs)
         except (KeyboardInterrupt, SystemExit):
             # Never convert an interrupt into a command error; let _loop shut down.
             raise
@@ -659,6 +663,9 @@ class RobotProxy:
             with self._control_epoch.get_lock():
                 self._control_epoch.value += 1
             self.clear_control_actions()
+
+    def check_control_health(self):
+        return self._rpc('check_control_health')
 
     def resume_controls(self):
         with self._control_submit_lock:

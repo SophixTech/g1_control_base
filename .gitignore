@@ -123,6 +123,9 @@ dist
 *.log.*
 
 # Data
+/raw_joints.h5
+/robot_pose_*.txt
+/robot_defaultpose_*.txt
 !**/alpaca-data-conversation.json
 
 # Editor

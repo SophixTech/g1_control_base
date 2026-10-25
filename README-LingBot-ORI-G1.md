@@ -204,3 +204,7 @@ scripts/run_lingbot_ori_server.sh \
 **网页预览目前不显示 mask**，`--preview-image-profile` 仍只控制原图/裁剪预览。mask 是模型服务端功能，客户端继续发送原始观测。服务启动日志会输出 mask 开关、相机和路径；改变参数后重启模型服务。
 
 离线测试覆盖显式开关、checkpoint 配置继承、实际 ORI mask 的像素结果、768×480 尺寸对齐、腕部不受头部 mask 影响、组合裁剪和防止重复遮罩。本次未加载真实 mask 训练权重或下发实机动作。
+
+## 可选传送带红点暂停/恢复
+
+网页 Camera Viewer 下方新增“传送带红点检测”，默认关闭。启用后根据 5 个头部相机 ROI 判断传送台是否就位，支持延迟停止、稳定后恢复及人工 Stop 取消自动恢复。配置位于当前 YAML 的 `vision.conveyor_gate`；未填写 5 个 ROI 时不能启用自动控制。完整配置及操作流程见 [README-Conveyor-Gate.md](README-Conveyor-Gate.md)。

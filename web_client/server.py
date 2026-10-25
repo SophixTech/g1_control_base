@@ -909,6 +909,19 @@ async def patch_config(req: ConfigPatchRequest):
         client_conf = client_state.config
         current_vla_client = client_state.vla_client
         current_robot = client_state.robot
+        gate_patch = {k.removeprefix('vision.conveyor_gate.'): v for k, v in flat.items()
+                      if k.startswith('vision.conveyor_gate.')}
+        if gate_patch:
+            from client.core.conveyor_gate import ConveyorGate, DEFAULTS
+            current = _config_to_dict(client_conf).get('vision', {}).get('conveyor_gate', DEFAULTS)
+            proposed = {**current, **gate_patch}
+            try:
+                if current_vla_client is not None:
+                    current_vla_client.set_conveyor_config(proposed)
+                elif proposed.get('rois'):
+                    ConveyorGate(proposed).validate()
+            except ValueError as exc:
+                raise HTTPException(409, str(exc)) from exc
         prev_robot_type = str(getattr(getattr(client_conf, 'robots', None), 'type', ''))
         _apply_flat_patch_new(client_conf, flat)
         next_robot_type = str(getattr(getattr(client_conf, 'robots', None), 'type', ''))
@@ -1431,6 +1444,8 @@ def _status_payload(vla_client, message: str, running: bool = True, paused: bool
         "message": message,
     }
     status.update(state)
+    status['control_requested'] = vla_client.control_requested
+    status['conveyor_gate'] = vla_client.conveyor_gate.status()
     return status
 
 def _start_observe(vla_client):
@@ -1474,8 +1489,10 @@ def _pause_vla_client(vla_client) -> dict:
         _stop_observe(vla_client)
     if state.get("inference_running", False):
         _stop_inference(vla_client)
-    if state.get("control_running", False):
+    if vla_client.control_requested:
         _stop_control(vla_client)
+    if vla_client.conveyor_gate.enabled:
+        state["control_running"] = False
     return state
 
 
@@ -1524,7 +1541,7 @@ async def _bg_toggle_control_and_broadcast(vla_client):
                 client_state.running = True
                 client_state.paused = False
 
-            if bool(getattr(vla_client, "is_control_thread_running", False)):
+            if vla_client.control_requested:
                 await asyncio.to_thread(_stop_control, vla_client)
                 message = "Control stopped."
             else:
@@ -1535,6 +1552,7 @@ async def _bg_toggle_control_and_broadcast(vla_client):
             await _broadcast_to_web({"type": "status", "data": payload})
         except Exception as e:
             logger.exception(f"Toggle control failed: {e}")
+            await _broadcast_to_web({"type": "conveyor_error", "data": {"message": str(e)}})
 
 @app.post("/api/client/pause")
 async def pause_client():
@@ -1620,9 +1638,9 @@ async def start_control_only():
     vla_client = client_state.vla_client
     if vla_client is None or not client_state.running:
         raise HTTPException(400, "Client is not running.")
-    if not bool(getattr(vla_client, "is_observe_thread_running", False)):
+    if not vla_client.control_requested and not bool(getattr(vla_client, "is_observe_thread_running", False)):
         raise HTTPException(400, "Observe is not running. Start Observe first.")
-    if not vla_client.thread_status["inference_running"]:
+    if not vla_client.conveyor_gate.enabled and not vla_client.thread_status["inference_running"]:
         raise HTTPException(400, "Inference is not running. Start Infer first.")
 
     asyncio.create_task(_bg_toggle_control_and_broadcast(vla_client))
@@ -1719,6 +1737,17 @@ def _cleanup_locked():
         del vla_client
         del robot
 
+@app.get("/api/client/conveyor")
+async def conveyor_status():
+    with client_state.lock:
+        vla = client_state.vla_client
+        config = _config_to_dict(client_state.config)
+    if vla is not None:
+        return vla.conveyor_gate.status(include_image=True)
+    from client.core.conveyor_gate import ConveyorGate
+    return ConveyorGate(config.get('vision', {}).get('conveyor_gate', {})).status(include_image=True)
+
+
 @app.get("/api/client/status")
 async def client_status():
     stats = await asyncio.to_thread(_collect_stats)
@@ -1807,6 +1836,8 @@ async def _client_control_reset(req: Optional[ManualControlRequest]):
             client_state.paused = True
             # Enforce the stop even if a stale UI pause flag says paused.
             _pause_vla_client(vla_client)
+            if vla_client.conveyor_gate.enabled and client_state.paused_thread_state is not None:
+                client_state.paused_thread_state["control_running"] = False
         data = {
             name: value for name, value in vars(req or ManualControlRequest()).items()
             if value is not None

@@ -626,6 +626,19 @@
           </div>
         </div>
 
+        <section id="conveyor-panel" style="padding:10px;border-top:1px solid #ccd3df">
+          <label><input type="checkbox" id="conveyor-enabled"> 传送带红点检测</label>
+          <div id="conveyor-state" role="status">未启用</div>
+          <img id="conveyor-preview" alt="五个红点检测区域" hidden style="width:100%;height:auto;margin-top:6px">
+          <div id="conveyor-points"></div>
+          <details><summary>检测配置</summary>
+            <label>延迟停止（秒） <input id="conveyor-delay" type="number" min="0" step="0.1" style="width:70px"></label>
+            <div>5 个 ROI：[x, y, 宽, 高]，参考图像 1280×800</div>
+            <textarea id="conveyor-rois" rows="4" style="width:100%" placeholder="[]"></textarea>
+            <button class="btn btn-sm" id="conveyor-apply">应用检测配置</button>
+            <div>Control 停止后可修改；持久保存请使用配置面板 Save。暂停时仍保留观察。</div>
+          </details>
+        </section>
       </div>
     </aside>
 
@@ -682,6 +695,7 @@
   <script src="/static/modules/language.js?v=20260924-shortcuts-popover-1"></script>
   <script src="/static/modules/recording.js"></script>
   <script src="/static/modules/manual-control.js?v=20260924-preset-selection-2"></script>
+  <script src="/static/modules/conveyor.js?v=20261024"></script>
   <script src="/static/app.js?v=20260924-shortcuts-popover-1"></script>
 </body>
 </html>

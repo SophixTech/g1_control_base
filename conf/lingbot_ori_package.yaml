@@ -43,7 +43,7 @@ language:
   task_progress_win_size: 10
 rdm:
   max_len: 100
-  mode: async
+  mode: sync
   observe_fps_window_size: 10
 record:
   auto: false
@@ -111,13 +111,13 @@ robots:
         presets:
           left:
             Default:
-            - -1.380243
-            - 0.785599
-            - 1.273623
-            - -0.15363
-            - -0.460959
-            - 1.036617
-            - 1.393993
+            - -2.57445097
+            - -0.13783756
+            - 2.31744719
+            - -1.235425
+            - 0.27574492
+            - 1.09134042
+            - 0.07435445
             Custom:
             - -1.0748
             - 0.6107
@@ -128,13 +128,13 @@ robots:
             - -0.1869
           right:
             Default:
-            - 2.1924
-            - -1.088653
-            - -1.854638
-            - 0.549745
-            - -0.131451
-            - -1.363351
-            - -0.093759
+            - 2.5003407
+            - 0.04657405
+            - -1.80324805
+            - 0.74977416
+            - -1.02820635
+            - -1.47244835
+            - -0.24094959
             Custom:
             - 1.072
             - -0.6103
@@ -172,8 +172,8 @@ robots:
         policy: manual
         presets:
           Default:
-          - 0.074568509
-          - 0.436332306
+          - -0.20881313
+          - 0.43633231
           Custom:
           - 0.0
           - 0.4363
@@ -183,8 +183,8 @@ robots:
         policy: manual
         presets:
           Default:
-          - 0.30148823
-          - 44.655044556
+          - 0.53857462
+          - 50.677994
           Custom:
           - 0.4012
           - 27.0
@@ -581,6 +581,46 @@ robots:
     - 1000.0
   type: agibot_g1
 vision:
+  conveyor_gate:
+    camera: cam.head
+    detect_hz: 10.0
+    enabled: false
+    frame_timeout_s: 0.5
+    hsv_red_ranges:
+    - - 0
+      - 10
+    - - 170
+      - 179
+    min_blob_area_px: 20
+    min_visible: 3
+    reference_size:
+    - 1280
+    - 800
+    resume_stable_s: 0.5
+    rois:
+    - - 11
+      - 235
+      - 48
+      - 48
+    - - 98
+      - 374
+      - 48
+      - 48
+    - - 172
+      - 510
+      - 48
+      - 48
+    - - 276
+      - 209
+      - 48
+      - 48
+    - - 454
+      - 411
+      - 48
+      - 48
+    saturation_min: 100
+    stop_delay_s: 2.0
+    value_min: 60
   history_frame: false
   preprocess:
     height: 480
@@ -600,18 +640,12 @@ visualize:
   trajectory:
     play: true
     selected_joints:
-    - 0
-    - 1
-    - 2
-    - 3
-    - 4
-    - 5
-    - 6
+    - 15
     source:
+    - ActionRaw
     - State
     - ActionFitted
-    - ActionRaw
-    window_span_sec: 4.0
+    window_span_sec: 15.0
   updata_fps: 30
 vla_zmq:
   heartbeat_interval: 1000

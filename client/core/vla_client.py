@@ -16,6 +16,7 @@ from client.utils import misc
 from client.utils.util import run_time_decorator
 from client.utils.multi_thread_timer import MultiThreadTimer
 from client.core.zmq_client import ZMQClient
+from client.core.conveyor_control import ConveyorControlMixin
 from client.core.joint_trace import JointTrace
 from server.models.lingbot_image_profile import ImageProfile
 from client.core.inter_chunk_fuser import InterChunkFuser
@@ -28,7 +29,7 @@ from client.core.shared_memory_manager import SharedMemoryManager
 from client.robots.base_robot import RobotBase
 
 
-class VLAClient():
+class VLAClient(ConveyorControlMixin):
     """VLA (Vision-Language-Action) Client for real-time robot control.
     
     This class manages the complete pipeline for VLA-based robot control, including:
@@ -162,6 +163,7 @@ class VLAClient():
                 self.joint_trace.close()
                 raise
             self.logger.info('Joint trace enabled: %s (joint %s)', directory, trace_joint)
+        self._init_conveyor()
         self.control_thread_timer.start()
         self.logger.info('VLAClient initialized.')
 
@@ -184,10 +186,14 @@ class VLAClient():
         self.logger.info('VLAClient observe thread started.')
 
     def stop_observe(self):
+        if self.conveyor_gate.authorized:
+            self.stop_control()
         self.is_observe_thread_running = False
         self.logger.info('VLAClient observe thread stopped.')
 
     def start_inference(self):
+        if self.conveyor_gate.authorized and self.conveyor_gate.phase not in ('resuming', 'running', 'countdown'):
+            raise ValueError('红点自动等待中，请等待归位或先 Control Stop')
         self.is_running = True
         if not self.inference_thread.is_alive():
             # A terminated Python Thread cannot be started a second time.
@@ -209,6 +215,11 @@ class VLAClient():
         self.logger.info('VLAClient inference thread stopped.')
 
     def start_control(self):
+        if self.conveyor_gate.enabled:
+            return self._arm_conveyor()
+        return self._start_control_direct()
+
+    def _start_control_direct(self, new_task=True):
         self.is_running = True
         with self._control_execution_lock:
             if self.is_control_thread_running:
@@ -216,6 +227,8 @@ class VLAClient():
             prepare_policy_control = getattr(self.robot, 'prepare_policy_control', None)
             if prepare_policy_control is not None:
                 prepare_policy_control()
+            if not new_task and not self.conveyor_gate.authorized:
+                return
             resume_controls = getattr(self.robot, 'resume_controls', None)
             if resume_controls is not None:
                 resume_controls()
@@ -225,9 +238,16 @@ class VLAClient():
         if not self.control_thread_timer.is_alive():
             self.control_thread_timer.start()
         # start new task in task_language manager for auto mode
-        self.task_language_manager.new_task()
+        if new_task:
+            self.task_language_manager.new_task()
 
     def stop_control(self):
+        if self.conveyor_gate.enabled:
+            self._cancel_conveyor()
+        else:
+            self._stop_control_direct()
+
+    def _stop_control_direct(self):
         with self._control_execution_lock:
             self.is_control_thread_running = False
             if getattr(self, 'joint_trace', None):
@@ -363,6 +383,8 @@ class VLAClient():
         - Stopping visualization components
         - Cleaning up all allocated resources
         """
+        self._conveyor_shutdown.set()
+        self.stop_control()
         self.is_observe_thread_running = False
         self.is_inference_thread_running = False
         self.is_control_thread_running = False
@@ -422,6 +444,8 @@ class VLAClient():
         }
         trace = getattr(self, 'joint_trace', None)
         status['joint_trace'] = trace.status if trace else None
+        status['conveyor_gate'] = self.conveyor_gate.status()
+        status['control_requested'] = self.control_requested
         status.update(self.realtime_data_manager.runtime_status)
         return status
 
@@ -511,6 +535,10 @@ class VLAClient():
                 decoded_observations = SharedMemoryManager.decode_observation(observations, self._raw_observe_shm_cache)
                 if decoded_observations is None:
                     continue
+                gate = self.conveyor_gate
+                if gate.enabled:
+                    gate.update(decoded_observations.get(gate.config['camera']),
+                                source_time=decoded_observations.get('_worker_publish_time'))
                 infer_data, encoded_imgs = self._process_data(decoded_observations)
                 if not self.realtime_data_manager.add_observe_data(
                     infer_data,
@@ -584,6 +612,8 @@ class VLAClient():
                 self.inference_error = f'{type(exc).__name__}: {exc}'
                 self.logger.exception('Inference step failed; clearing stale actions and retrying')
                 self.stop_control()
+                if self.conveyor_gate.enabled:
+                    self.conveyor_gate.disarm(str(exc))
                 with self._inference_execution_lock:
                     self.realtime_data_manager.clear()
                 time.sleep(min(0.1 * 2 ** min(consecutive_errors - 1, 4), 1.6))
@@ -633,6 +663,8 @@ class VLAClient():
                             self.robot.control_robot(action_fitted)
             except Exception as exc:
                 self._stop_control_thread_on_error()
+                if self.conveyor_gate.enabled:
+                    self.conveyor_gate.disarm(str(exc))
                 self.logger.error("Robot control failed: %s", exc)
                 raise
 
