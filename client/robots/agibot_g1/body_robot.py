@@ -9,6 +9,7 @@ from .sdk_robot import Robot
 from a2d_sdk.robot import CosineCamera as Camera
 from ..base_robot import RobotBase
 from client.core.joint_trace import JointTrace
+from client.core.gripper_delay import GripperDelay
 # from copy import copy
 
 
@@ -44,6 +45,8 @@ class RobotBody(RobotBase):
         self._gripper_vmin = 35.0
         self._gripper_vmax = 120.0
 
+        self._left_arm_hold_position = None
+        self._gripper_delay = GripperDelay()
         self.gripper_count = 0
         self._policy_control_ready = False
         self._joint_trace = None
@@ -97,6 +100,7 @@ class RobotBody(RobotBase):
         if feedback.shape != (2,) or not np.isfinite(feedback).all():
             raise RuntimeError('gripper state must contain 2 finite values')
         self.gripper_count = 0
+        self._gripper_delay.clear()
         self._policy_control_ready = True
 
     def configure_joint_trace(self, directory, joint):
@@ -115,8 +119,27 @@ class RobotBody(RobotBase):
             self._trace_feedback_stamp = stamp
             trace.record('feedback', device_stamp_ns=int(stamp), q=float(arm[trace.joint]))
 
-    def control_robot(self, action, trace_context=None):
-        """Execute absolute arms, direct left gripper and curved right gripper."""
+    def get_policy_left_arm_hold_position(self):
+        """Keep the last manual/reset target; otherwise latch initial feedback."""
+        if not self.config.get('hold_left_arm', False):
+            return None
+        if self._left_arm_hold_position is None:
+            arm, stamp = self.robot.arm_joint_states()
+            self._check_fresh(stamp, 'arm state')
+            arm = np.asarray(arm, dtype=float)
+            if arm.shape != (14,) or not np.isfinite(arm).all():
+                raise RuntimeError('arm state must contain 14 finite values')
+            self._left_arm_hold_position = arm[:7].copy()
+        return self._left_arm_hold_position.tolist()
+
+    def set_right_gripper_quartic_enabled(self, enabled):
+        """Apply the UI setting inside the hardware worker process."""
+        if not isinstance(enabled, bool):
+            raise ValueError('right_gripper_quartic_enabled must be a boolean')
+        self.config['right_gripper_quartic_enabled'] = enabled
+
+    def control_robot(self, action, trace_context=None, gripper_delay_s=0.0):
+        """Execute absolute arms and optionally shape the right gripper command."""
         action = np.asarray(action, dtype=float)
         if action.shape != (16,) or not np.isfinite(action).all():
             raise ValueError('G1 policy action must contain 16 finite values')
@@ -124,17 +147,24 @@ class RobotBody(RobotBase):
             raise RuntimeError('Call prepare_policy_control() before enabling G1 policy control')
         send_gripper = self.gripper_count % self.config['gripper_freq'] == 0
         self._check_live_status()
-        self._send_arm_command(action[:14].tolist(), trace_context, source='policy')
-        if send_gripper:
-            left = float(np.clip(action[14], 0.0, 1.0))
-            right = float(np.clip(action[15], 0.0, 1.0))
-            right = right ** 4 / (right ** 4 + (1.0 - right) ** 4)
+        arm_command = action[:14].copy()
+        hold = self.get_policy_left_arm_hold_position()
+        if hold is not None:
+            arm_command[:7] = hold
+        self._send_arm_command(arm_command.tolist(), trace_context, source='policy')
+        delayed = self._gripper_delay.sample(action[14:16], time.monotonic(), gripper_delay_s)
+        if send_gripper and delayed is not None:
+            left = float(np.clip(delayed[0], 0.0, 1.0))
+            right = float(np.clip(delayed[1], 0.0, 1.0))
+            if self.config.get('right_gripper_quartic_enabled', True):
+                right = right ** 4 / (right ** 4 + (1.0 - right) ** 4)
             self._send_gripper_command([left, right], trace_context,
-                                       source='policy', input_target=float(action[15]))
+                                       source='policy', input_target=float(delayed[1]))
             self.gripper_count = 0
         elif self._joint_trace is not None and self._joint_trace.joint == 15:
             self._joint_trace.record('gripper_skipped', **(trace_context or {}),
-                                     input_target=float(action[15]), reason='rate_divider')
+                                     input_target=float(action[15]),
+                                     reason='delay_warmup' if delayed is None else 'rate_divider')
         self.gripper_count += 1
 
     def _send_gripper_command(self, positions, trace_context=None, source='manual', input_target=None):
@@ -186,6 +216,8 @@ class RobotBody(RobotBase):
         """
         if 'arm' in data:
             self._send_arm_command(data['arm'])
+            # Manual/Reset moves establish the target; policy never changes it.
+            self._left_arm_hold_position = np.asarray(data['arm'][:7], dtype=float).copy()
         if 'gripper' in data:
             self._send_gripper_command(data['gripper'], source='manual_or_reset')
         if 'hand_as_gripper' in data:

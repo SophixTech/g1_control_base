@@ -38,6 +38,8 @@ def get_agibot_g1_config():
     config.camera.non_ref_fetch_workers = 2
     config.proprio_names = ['arm', 'hand' if 'hand' in config.hand_type else 'gripper', 'head', 'waist']
     config.gripper_freq = 40
+    config.right_gripper_quartic_enabled = True
+    config.hold_left_arm = False
     config.head_freq = 40
     config.manual_arm_interval = 0.01
     # Package recovery pose from g1_pc_move_to_package_target_pose.py.

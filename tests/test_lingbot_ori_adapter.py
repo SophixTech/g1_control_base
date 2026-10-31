@@ -86,7 +86,7 @@ def case(tmp_path, monkeypatch):
 
 def observation():
     return [{'obs': {'state': np.arange(20, dtype=np.float32), 'language': ['conditional task'],
-                     **{key: np.full((4, 5, 3), j + 1, dtype=np.uint8)
+                     **{key: np.full((10, 16, 3) if key == 'cam.head' else (4, 5, 3), j + 1, dtype=np.uint8)
                         for j, key in enumerate(ModelVLA.CAMERA_KEYS)}},
              'ref_timestamp': 123, 'loc_timestamp': 456.0}]
 
@@ -105,7 +105,11 @@ def test_action_contract_and_input_ownership(case):
     mapped = case.calls[-1][1]
     np.testing.assert_array_equal(mapped['observation.state'], before[0]['obs']['state'][:16])
     for source_key, target in ModelVLA.CAMERA_KEYS.items():
-        np.testing.assert_array_equal(mapped[target], before[0]['obs'][source_key])
+        if source_key == 'cam.head':
+            assert mapped[target].shape == (480, 768, 3)
+            assert np.all(mapped[target] == before[0]['obs'][source_key][0, 0, 0])
+        else:
+            np.testing.assert_array_equal(mapped[target], before[0]['obs'][source_key])
     assert case.calls[0][1]['use_length'] == 50
     assert case.calls[1] == ('reset', 'package_a2d')
 
@@ -313,7 +317,9 @@ def test_mask_can_be_explicitly_disabled(native_mask_case):
     case.config['image_mask_path'] = '/nonexistent/mask.png'
     model = ModelVLA(case.config)
     frame = np.full((800,1280,3), 123, dtype=np.uint8)
-    np.testing.assert_array_equal(model.preprocess_image('cam.head', ModelVLA.CAMERA_KEYS['cam.head'], frame), frame)
+    result = model.preprocess_image('cam.head', ModelVLA.CAMERA_KEYS['cam.head'], frame)
+    assert result.shape == (480, 768, 3)
+    assert np.all(result == 123)
 
 
 def test_mask_explicit_enable_and_bad_path(native_mask_case):
@@ -338,3 +344,17 @@ def test_mask_cli_override_and_model_isolation(monkeypatch):
     monkeypatch.setattr(sys,'argv',['run_server.py','--model_type','lingbot_ecot','--image-mask-enabled'])
     with pytest.raises(ValueError, match='only for lingbot_ori'):
         override_config_with_args(get_vla_server_config(), parse_args())
+
+
+def test_head_resize_preserves_observation_pairing(case):
+    model = ModelVLA(case.config)
+    for marker in (10, 40, 90, 170):
+        data = observation()
+        data[0]['ref_timestamp'] = marker
+        for j, key in enumerate(ModelVLA.CAMERA_KEYS):
+            data[0]['obs'][key][:] = marker + j
+        result = model.infer(data)
+        mapped = case.calls[-1][1]
+        assert result['ref_timestamp'] == marker
+        for j, target in enumerate(ModelVLA.CAMERA_KEYS.values()):
+            assert np.all(mapped[target] == marker + j)

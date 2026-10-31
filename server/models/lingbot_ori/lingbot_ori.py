@@ -10,9 +10,9 @@ import sys
 
 import numpy as np
 import yaml
-from PIL import Image
 
 from server.models.lingbot_image_profile import ImageProfile
+from .head_resize import resize_head_rgb
 
 
 class ModelVLA:
@@ -122,6 +122,8 @@ class ModelVLA:
     def __init__(self, config):
         self.cfg = config
         self.image_profile = ImageProfile(config.get("image_profile", "original"))
+        logging.getLogger(__name__).info(
+            'ORI head resize: FFmpeg libswscale Lanczos -> 768x480 RGB, before mask; wrists unchanged')
         self.chunk_size = 50
         artifacts = self.validate_artifacts(config)
         repo = Path(artifacts['repo_path'])
@@ -182,12 +184,12 @@ class ModelVLA:
             raise ValueError('Loaded ORI policy/FeatureTransform must have chunk_size=50')
 
     def preprocess_image(self, source, target, frame):
+        # Transform the head in this observation synchronously: no frame queue,
+        # decoder buffering, or timestamp change; wrists retain their own pixels.
+        if source == 'cam.head':
+            frame = resize_head_rgb(frame)
         mask = getattr(self.policy, 'openrail_image_mask', None)
         if mask is not None and mask.enabled and target == mask.camera:
-            # The G1 head stream and data-v1 training frames share a 16:10 canvas.
-            # Only this known full-frame resize is allowed; never stretch arbitrary masks.
-            if source == 'cam.head' and frame.shape[:2] == (800, 1280) and mask.keep.shape == (480, 768):
-                frame = np.array(Image.fromarray(frame).resize((768, 480), Image.Resampling.LANCZOS))
             frame = mask.apply(frame, target, channels_last=True)
         return self.image_profile.apply(source, frame)
 

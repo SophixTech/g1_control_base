@@ -2,13 +2,14 @@
 # Auto-generated — edit values as needed
 
 controller:
+  gripper_delay_steps: 10
   gripper_offset: 0
   period: 3.75
   raw_fps: 30
-  speed: 1.0
+  speed: 1.3
   wait_time: 10
 inter_chunk:
-  inter_chunk_mode: min_jerk
+  inter_chunk_mode: smooth_velocity
   min_jerk:
     adaptive_factor: -1.0
     blend_threshold: 0.7
@@ -25,6 +26,7 @@ intra_chunk:
   fitting_deg: 4
   fitting_num_samples: 64
   gripper_dim: 2
+  gripper_zero_order_hold: true
   head_dim: 2
   intra_chunk_mode: fitting
   joint_dim: 14
@@ -43,7 +45,7 @@ language:
   task_progress_win_size: 10
 rdm:
   max_len: 100
-  mode: sync
+  mode: async
   observe_fps_window_size: 10
 record:
   auto: false
@@ -56,7 +58,7 @@ record:
   is_record_eval_log: false
   is_record_expe_data: false
   lerobot:
-    action_shape: 16
+    action_shape: 22
     cam.hand_left:
       encode:
         codec: mp4v
@@ -98,7 +100,7 @@ record:
     total_tasks: 0
     total_videos: 0
     video_path: videos/chunk-{episode_chunk:03d}/{video_key}/episode_{episode_index:06d}.mp4
-  save_dir: data/lingbot_ori_package
+  save_dir: data/recording
   save_raw: true
   switch: false
 robots:
@@ -184,7 +186,7 @@ robots:
         presets:
           Default:
           - 0.53857462
-          - 50.677994
+          - 48.677994
           Custom:
           - 0.4012
           - 27.0
@@ -218,12 +220,14 @@ robots:
     gripper_freq: 9
     hand_type: gripper
     head_freq: 40
+    hold_left_arm: true
     manual_arm_interval: 0.01
     proprio_names:
     - arm
     - gripper
     - head
     - waist
+    right_gripper_quartic_enabled: false
   mock:
     action_layout:
       arm:
@@ -597,27 +601,7 @@ vision:
     - 1280
     - 800
     resume_stable_s: 0.5
-    rois:
-    - - 11
-      - 235
-      - 48
-      - 48
-    - - 98
-      - 374
-      - 48
-      - 48
-    - - 172
-      - 510
-      - 48
-      - 48
-    - - 276
-      - 209
-      - 48
-      - 48
-    - - 454
-      - 411
-      - 48
-      - 48
+    rois: []
     saturation_min: 100
     stop_delay_s: 2.0
     value_min: 60
@@ -632,6 +616,8 @@ visualize:
     open_head: true
     open_wrist_left: true
     open_wrist_right: true
+  head_mask_preview_enabled: false
+  head_mask_preview_path: ''
   host: 0.0.0.0
   max_size: 10485760
   ping_interval: 20
@@ -640,16 +626,21 @@ visualize:
   trajectory:
     play: true
     selected_joints:
+    - 7
+    - 8
+    - 9
+    - 10
+    - 11
+    - 12
+    - 13
     - 15
     source:
-    - ActionRaw
     - State
-    - ActionFitted
-    window_span_sec: 15.0
+    window_span_sec: 10.0
   updata_fps: 30
 vla_zmq:
   heartbeat_interval: 1000
   heartbeat_timeout: 30000
-  infer_timeout: 10000
+  infer_timeout: 500
   ip: 127.0.0.1
   port: '5566'

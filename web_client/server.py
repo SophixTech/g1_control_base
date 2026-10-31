@@ -909,6 +909,40 @@ async def patch_config(req: ConfigPatchRequest):
         client_conf = client_state.config
         current_vla_client = client_state.vla_client
         current_robot = client_state.robot
+        preview_enabled_key = 'visualize.head_mask_preview_enabled'
+        preview_path_key = 'visualize.head_mask_preview_path'
+        if preview_enabled_key in flat or preview_path_key in flat:
+            enabled = flat.get(preview_enabled_key, client_conf.visualize.get('head_mask_preview_enabled', False))
+            path = flat.get(preview_path_key, client_conf.visualize.get('head_mask_preview_path', ''))
+            if not isinstance(enabled, bool) or not isinstance(path, str):
+                raise HTTPException(422, 'Mask preview requires a boolean switch and a string path')
+            try:
+                if current_vla_client is not None:
+                    current_vla_client.set_mask_preview(enabled, path)
+                else:
+                    from client.core.mask_preview import HeadMaskPreview
+                    HeadMaskPreview(enabled, path)
+            except (OSError, ValueError) as exc:
+                raise HTTPException(422, str(exc)) from exc
+        hold_key = 'intra_chunk.gripper_zero_order_hold'
+        if hold_key in flat and not isinstance(flat[hold_key], bool):
+            raise HTTPException(422, 'gripper_zero_order_hold must be a boolean')
+        delay_key = 'controller.gripper_delay_steps'
+        if delay_key in flat:
+            steps = flat[delay_key]
+            if type(steps) is not int or steps < 0:
+                raise HTTPException(422, 'gripper_delay_steps must be a nonnegative integer')
+            robot_type = flat.get('robots.type', client_conf.robots.type)
+            robot_type = getattr(robot_type, 'value', robot_type)
+            if steps and robot_type != 'agibot_g1':
+                raise HTTPException(422, 'Gripper delay currently supports agibot_g1 only')
+        gripper_curve_key = 'robots.agibot_g1.right_gripper_quartic_enabled'
+        if gripper_curve_key in flat:
+            enabled = flat[gripper_curve_key]
+            if not isinstance(enabled, bool):
+                raise HTTPException(422, 'right_gripper_quartic_enabled must be a boolean')
+            if current_robot is not None and hasattr(current_robot, 'set_right_gripper_quartic_enabled'):
+                current_robot.set_right_gripper_quartic_enabled(enabled)
         gate_patch = {k.removeprefix('vision.conveyor_gate.'): v for k, v in flat.items()
                       if k.startswith('vision.conveyor_gate.')}
         if gate_patch:

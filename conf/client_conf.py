@@ -70,6 +70,7 @@ def get_intra_chunk_config() -> ConfigDict:
             - joint_dim/gripper_dim: Degrees of freedom specifications
     """
     config = ConfigDict()
+    config.gripper_zero_order_hold = False  # Bypass gripper filtering in fitting mode.
     config.filter_window_size = 4  # Window size for gripper action filtering (actual size = filter_window_size * 2 + 1)
     config.min_gripper_action_threshold = 0.05  # Minimum gripper action threshold, values below this are set to 0.0
     config.max_gripper_action_threshold = 0.95  # Maximum gripper action threshold, values above this are set to 1.0
@@ -133,6 +134,7 @@ def get_controller_config() -> ConfigDict:
     config.wait_time = 10  # Wait time for the next inference step in millisecond. Note: if robot hesitate to action, increase it.
     config.period = 3.75   # Control period for sending command to robot in milliseconds
     config.speed = 1.0     # The execution speed with respect to tele-operation speed
+    config.gripper_delay_steps = 0  # Raw action points; continuous across chunks.
     config.raw_fps = 30    # The FPS of the dataset used to train vla/wam model
     config.gripper_offset = 5  # Gripper forward offset. Note: positive value, gripper slow, increase it.
     return config
@@ -154,6 +156,8 @@ def get_observer_config() -> ConfigDict:
 def get_visualize_config() -> ConfigDict:
     """Generate configuration for web visual panels."""
     config = ConfigDict()
+    config.head_mask_preview_enabled = False
+    config.head_mask_preview_path = ''
 
     # config.server = ConfigDict()
     config.host = '0.0.0.0'

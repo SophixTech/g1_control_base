@@ -265,6 +265,15 @@ class IntraChunkSmoother():
         if length == 0:
             return np.zeros((num_grippers, 0)), np.zeros((num_grippers, 0)), np.zeros((num_grippers, 0))
 
+        if self.config.get('gripper_zero_order_hold', False):
+            # Use only the raw point at/before each control time: no window
+            # average, threshold snapping, or averaging with a future point.
+            target_times = np.arange(start_time, end_time, time_step)
+            indices = np.clip(np.searchsorted(timestamps, target_times, side='right') - 1,
+                              0, length - 1)
+            held = gripper_chunks[:, indices].copy()
+            return held, np.zeros_like(held), np.zeros_like(held)
+
         # Sliding-window mean + threshold snap, vectorised over every output
         # index at once via a cumulative sum.
         #

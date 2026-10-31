@@ -271,6 +271,7 @@ class _RobotWorker:
                 item = self._control_queue.get(timeout=0.05)
                 epoch, action = item[:2]
                 trace_context = item[2] if len(item) > 2 else None
+                gripper_delay_s = item[3] if len(item) > 3 else 0.0
             except queue.Empty:
                 continue
 
@@ -288,6 +289,7 @@ class _RobotWorker:
                     self._trace_discard(trace_context, 'superseded')
                     epoch, action = next_epoch, next_action
                     trace_context = next_trace
+                    gripper_delay_s = item[3] if len(item) > 3 else 0.0
                 else:
                     self._trace_discard(next_trace, 'old_epoch')
 
@@ -304,7 +306,10 @@ class _RobotWorker:
                         if epoch != self._control_epoch.value:
                             self._trace_discard(trace_context, 'paused_or_reset')
                             continue
-                    if trace_context:
+                    if gripper_delay_s:
+                        self._robot.control_robot(action, trace_context=trace_context,
+                                                  gripper_delay_s=gripper_delay_s)
+                    elif trace_context:
                         self._robot.control_robot(action, trace_context=trace_context)
                     else:
                         self._robot.control_robot(action)
@@ -631,7 +636,7 @@ class RobotProxy:
                     return value
                 raise value
 
-    def control_robot(self, action, trace_context=None):
+    def control_robot(self, action, trace_context=None, gripper_delay_s=0.0):
         """Queue the newest trajectory action without waiting for an RPC reply."""
         with self._control_submit_lock:
             if not self._control_enabled:
@@ -650,9 +655,9 @@ class RobotProxy:
             action_snapshot = np.array(action, copy=True)
             with self._control_epoch.get_lock():
                 epoch = self._control_epoch.value
-            item = (epoch, action_snapshot)
-            if trace_context is not None:
-                item += (dict(trace_context),)
+            item = (epoch, action_snapshot,
+                    dict(trace_context) if trace_context is not None else None,
+                    float(gripper_delay_s))
             self._control_queue.put_nowait(item)
         return None
 

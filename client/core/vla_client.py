@@ -18,6 +18,7 @@ from client.utils.multi_thread_timer import MultiThreadTimer
 from client.core.zmq_client import ZMQClient
 from client.core.conveyor_control import ConveyorControlMixin
 from client.core.joint_trace import JointTrace
+from client.core.mask_preview import HeadMaskPreview
 from server.models.lingbot_image_profile import ImageProfile
 from client.core.inter_chunk_fuser import InterChunkFuser
 from client.core.intra_chunk_smoother import IntraChunkSmoother
@@ -118,6 +119,8 @@ class VLAClient(ConveyorControlMixin):
         # Define image preprocess function
         self.update_preprocess_func()
         self.preview_image_profile = ImageProfile(os.environ.get("OPEN_RAIL_PREVIEW_IMAGE_PROFILE", "original"))
+        self.set_mask_preview(self.config.visualize.get('head_mask_preview_enabled', False),
+                              self.config.visualize.get('head_mask_preview_path', ''))
 
         self.observe_thread = threading.Thread(target=self._observe_thread_fun, daemon=True)
         self.process_observe_thread = threading.Thread(target=self._process_observe_thread_fun, daemon=True)
@@ -650,6 +653,10 @@ class VLAClient(ConveyorControlMixin):
                     else:
                         action_fitted, action_raw, vel_fitted, acc_fitted = self.realtime_data_manager.get_action_fitted()
                     if action_fitted is not None:
+                        delay_steps = int(getattr(self.config.controller, 'gripper_delay_steps', 0))
+                        delay_options = {}
+                        if delay_steps:
+                            delay_options['gripper_delay_s'] = delay_steps * self.observe_period
                         if trace:
                             self._trace_command_id += 1
                             trace_context.update(command_id=self._trace_command_id,
@@ -658,9 +665,9 @@ class VLAClient(ConveyorControlMixin):
                                          q=float(action_fitted[trace.joint]),
                                          planned_velocity=float(vel_fitted[trace.joint]),
                                          planned_acceleration=float(acc_fitted[trace.joint]))
-                            self.robot.control_robot(action_fitted, trace_context=trace_context)
+                            self.robot.control_robot(action_fitted, trace_context=trace_context, **delay_options)
                         else:
-                            self.robot.control_robot(action_fitted)
+                            self.robot.control_robot(action_fitted, **delay_options)
             except Exception as exc:
                 self._stop_control_thread_on_error()
                 if self.conveyor_gate.enabled:
@@ -919,19 +926,31 @@ class VLAClient(ConveyorControlMixin):
         else:
             self.logger.warning("No observe data, skip inference.")
 
+    def set_mask_preview(self, enabled, path):
+        # Load first, then atomically swap the display configuration.
+        self.head_mask_preview = HeadMaskPreview(enabled, path)
+
     def _preview_images(self, encoded_imgs):
         """Crop display copies of transported frames; inference retains originals."""
         profile = getattr(self, 'preview_image_profile', None)
-        if profile is None or profile.name == 'original':
+        mask = getattr(self, 'head_mask_preview', None)
+        masked = mask is not None and mask.enabled
+        if (profile is None or profile.name == 'original') and not masked:
             return encoded_imgs
         preview = dict(encoded_imgs)
         for key in ('cam.head', 'cam.hand_left'):
             if key not in encoded_imgs:
                 continue
+            if key != 'cam.head' and (profile is None or profile.name == 'original'):
+                continue
             frame = cv2.imdecode(np.frombuffer(encoded_imgs[key], dtype=np.uint8), cv2.IMREAD_COLOR)
             if frame is None:
                 raise ValueError(f'Cannot decode preview image: {key}')
-            rgb = profile.apply(key, cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+            rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            if masked and key == 'cam.head':
+                rgb = mask.apply(rgb)
+            if profile is not None:
+                rgb = profile.apply(key, rgb)
             ok, encoded = cv2.imencode('.jpg', cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR),
                                        [cv2.IMWRITE_JPEG_QUALITY, 95])
             if not ok:
@@ -1071,7 +1090,13 @@ class VLAClient(ConveyorControlMixin):
             loc_timestamp = action_raw['loc_timestamp']
             # Generate action and timestamp chunks
             period = self.observe_period
+            left_arm_hold = None
+            if hasattr(self.robot, 'get_policy_left_arm_hold_position'):
+                left_arm_hold = self.robot.get_policy_left_arm_hold_position()
             for index, action in enumerate(pred_action):
+                if left_arm_hold is not None:
+                    action = np.array(action, copy=True)
+                    action[:7] = left_arm_hold
                 action_chunk.append(action)
                 timestamp_chunk.append(period * index)
             trace = getattr(self, 'joint_trace', None)
@@ -1085,6 +1110,8 @@ class VLAClient(ConveyorControlMixin):
                              observation_joint_rad=(action_raw.get('_trace_observation_q') if trace.joint < 14 else None),
                              observation_value=action_raw.get('_trace_observation_q'),
                              gripper_offset=int(getattr(self.config.controller, "gripper_offset", 0)),
+                             gripper_delay_steps=int(getattr(self.config.controller, "gripper_delay_steps", 0)),
+                             gripper_zero_order_hold=bool(self.config.intra_chunk.get('gripper_zero_order_hold', False)),
                              raw_period_s=period, speed=float(self.config.controller.speed),
                              control_period_ms=float(self.config.controller.period),
                              rdm_mode=self.config.rdm.mode,

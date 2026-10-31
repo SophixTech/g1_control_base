@@ -35,7 +35,7 @@ const CONFIG_SELECT_OPTIONS = {
 
 // Keys that must be treated as integers (rendered as number input, parsed with parseInt)
 const CONFIG_INT_KEYS = new Set([
-  'fitting_num_samples', 'search_length', 'gripper_offset',
+  'fitting_num_samples', 'search_length', 'gripper_offset', 'gripper_delay_steps',
   'fps', 'height', 'width', 'update_interval_ms', 'max_len', 'observe_fps_window_size', 'filter_window_size', 'gripper_dim', 'head_dim', 'joint_dim', 'state_shape', 'action_shape', 'chunk_size', 'channel'
 ]);
 
@@ -135,11 +135,16 @@ const CONFIG_READONLY_DOT_KEYS = new Set([
 //   - visualize.main_parameters: { "dot.key": "Label", ... }
 const DEFAULT_MAIN_PARAMETER_KEYS = {
   'robots.type': 'Robot Type',
+  'visualize.head_mask_preview_enabled': '头部 Mask 预览（仅显示）',
+  'visualize.head_mask_preview_path': '预览 Mask 路径',
   'rdm.mode': 'Mode',
   'controller.wait_time': 'Wait Time[ms]',
   'controller.period': 'Control Period[ms]',
   'controller.speed': 'Control Speed',
   'controller.gripper_offset': 'Gripper Offset',
+  'controller.gripper_delay_steps': '夹爪延迟（动作点）',
+  'intra_chunk.gripper_zero_order_hold': '夹爪零阶保持（禁用平滑）',
+  'robots.agibot_g1.right_gripper_quartic_enabled': '右夹爪四次方映射',
   'inter_chunk.inter_chunk_mode': 'Inter-Chunk Mode',
   'intra_chunk.intra_chunk_mode': 'Intra-Chunk Mode',
   'vision.preprocess.method': 'Img Proc Method',
@@ -975,9 +980,16 @@ function createCfgRow(dotKey, label, value, options = {}) {
     });
   } else if (typeof value === 'boolean') {
     input = document.createElement('select');
+    const isGripperCurve = dotKey === 'robots.agibot_g1.right_gripper_quartic_enabled';
+    const isGripperHold = dotKey === 'intra_chunk.gripper_zero_order_hold';
+    const isHeadMask = dotKey === 'visualize.head_mask_preview_enabled';
+    if (isHeadMask) input.title = '仅修改 Head 窗口的显示；不修改发送给模型的图像。请将预览路径与服务端 mask 路径保持一致。';
+    if (isGripperHold) input.title = '用于 fitting 模式。开启：保持当前原始动作点，跳过窗口平均、阈值吸附和相邻点平均；关闭：原有夹爪平滑。延迟和四次方映射独立设置。';
+    if (isGripperCurve) input.title = '开启：x⁴ / (x⁴ + (1−x)⁴)；关闭：直接下发 x。两者均先限制到 [0,1]，仅作用于右夹爪自动控制。';
     ['true', 'false'].forEach(opt => {
       const o = document.createElement('option');
-      o.value = opt; o.textContent = opt;
+      o.value = opt;
+      o.textContent = (isGripperCurve || isGripperHold || isHeadMask) ? (opt === 'true' ? '开启' : '关闭') : opt;
       if (String(value) === opt) o.selected = true;
       input.appendChild(o);
     });

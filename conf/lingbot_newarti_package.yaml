@@ -2,6 +2,7 @@
 # Auto-generated — edit values as needed
 
 controller:
+  gripper_delay_steps: 0
   gripper_offset: 5
   period: 3.75
   raw_fps: 30
@@ -21,6 +22,7 @@ inter_chunk:
     kf_vel: 2.5
   sync: {}
 intra_chunk:
+  gripper_zero_order_hold: false
   filter_window_size: 4
   fitting_deg: 4
   fitting_num_samples: 64
@@ -216,6 +218,7 @@ robots:
       non_ref_fetch_workers: 2
       ref: head
     gripper_freq: 9
+    right_gripper_quartic_enabled: true
     hand_type: gripper
     head_freq: 40
     manual_arm_interval: 0.01
@@ -608,6 +611,8 @@ vision:
     method: none
     width: 640
 visualize:
+  head_mask_preview_enabled: false
+  head_mask_preview_path: ''
   camera:
     open_head: true
     open_wrist_left: true
