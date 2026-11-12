@@ -1,0 +1,157 @@
+{
+  "image": "final.jpg",
+  "reference_size": [
+    1280,
+    800
+  ],
+  "points": [
+    {
+      "id": 1,
+      "center_xy": [
+        204.62,
+        65.84
+      ],
+      "pixel_xy": [
+        205,
+        66
+      ],
+      "roi_xywh": [
+        190,
+        53,
+        30,
+        26
+      ],
+      "area": 110
+    },
+    {
+      "id": 2,
+      "center_xy": [
+        239.81,
+        116.3
+      ],
+      "pixel_xy": [
+        240,
+        116
+      ],
+      "roi_xywh": [
+        226,
+        105,
+        29,
+        23
+      ],
+      "area": 74
+    },
+    {
+      "id": 3,
+      "center_xy": [
+        20.82,
+        230.21
+      ],
+      "pixel_xy": [
+        21,
+        230
+      ],
+      "roi_xywh": [
+        0,
+        211,
+        46,
+        38
+      ],
+      "area": 485
+    },
+    {
+      "id": 4,
+      "center_xy": [
+        406.9,
+        348.28
+      ],
+      "pixel_xy": [
+        407,
+        348
+      ],
+      "roi_xywh": [
+        388,
+        331,
+        39,
+        36
+      ],
+      "area": 324
+    },
+    {
+      "id": 5,
+      "center_xy": [
+        160.51,
+        589.15
+      ],
+      "pixel_xy": [
+        161,
+        589
+      ],
+      "roi_xywh": [
+        135,
+        563,
+        53,
+        53
+      ],
+      "area": 927
+    }
+  ],
+  "config": {
+    "enabled": true,
+    "camera": "cam.head",
+    "reference_size": [
+      1280,
+      800
+    ],
+    "rois": [
+      [
+        190,
+        53,
+        30,
+        26
+      ],
+      [
+        226,
+        105,
+        29,
+        23
+      ],
+      [
+        0,
+        211,
+        46,
+        38
+      ],
+      [
+        388,
+        331,
+        39,
+        36
+      ],
+      [
+        135,
+        563,
+        53,
+        53
+      ]
+    ],
+    "min_visible": 3,
+    "stop_delay_s": 2.0,
+    "resume_stable_s": 0.5,
+    "detect_hz": 10.0,
+    "frame_timeout_s": 0.5,
+    "hsv_red_ranges": [
+      [
+        0,
+        10
+      ],
+      [
+        170,
+        179
+      ]
+    ],
+    "saturation_min": 100,
+    "value_min": 60,
+    "min_blob_area_px": 20
+  }
+}

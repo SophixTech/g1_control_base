@@ -1,0 +1,6 @@
+session,samples,closed_before,closed_to_mid,open_before,open_to_mid,mid_before,mid_after,switches_before,switches_after,short_intervals_before,short_intervals_after,closed_runs,closed_runs_affected,closed_runs_never_reach_08,jumps_before,jumps_after
+20261018_125406_ypuqxqe4,5945,1992,117,3847,122,106,345,93,75,45,28,49,43,6,149,81
+20261018_131939_4jo90bsa,7974,1135,27,6815,29,24,80,32,22,17,8,17,14,4,42,24
+20261018_135657_btme_2br,7856,0,0,7856,0,0,0,0,0,0,0,0,0,0,0,0
+20261018_141456_m6wcxxs4,23900,8044,592,15477,403,379,1374,349,287,157,99,194,160,26,517,274
+20261018_144451_0tr6c6d5,7980,2781,239,5037,249,162,650,142,124,66,49,75,66,6,217,94

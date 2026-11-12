@@ -1,0 +1,60 @@
+{
+  "alignment": {
+    "action_joint": "linear_interpolation",
+    "fps": 30,
+    "gripper_action": "zero_order_hold",
+    "master_stream": "camera/hand_left/color",
+    "state_joint": "linear_interpolation"
+  },
+  "alignment_path": "meta/alignments/episode-000001.json",
+  "alignment_run_id": "93a04c62-ace3-50be-9ad9-7f4ac954c39b",
+  "alignment_sha256": "3c62477d7ce5cd0e0b7679efb64f39ea812de74ee1b6adc72b36837437bbd849",
+  "annotation_id": "9fd0ac41-4fac-4454-b296-29ae8ba6fcf6",
+  "annotation_revision": 1,
+  "annotation_run_id": "1627a6bc-90f4-40f8-835d-ad0de81858d7",
+  "annotation_source": "model",
+  "dataset_id": "c6033863-82d8-4aa1-bb79-b513784ae609",
+  "end_timestamp_ns": 1781180025565123584,
+  "episode_id": "8b84b40d-5c59-47a0-a870-6ae318dfc892",
+  "episode_index": 1,
+  "events": {
+    "grasp_success_frame": null,
+    "placement_success_frame": null,
+    "release_frame": null
+  },
+  "execution_status": "succeeded",
+  "extra_labels": {
+    "self_annotation": {
+      "adapter_version": "pre_grasp_visibility.v1",
+      "category": "failure",
+      "grasp_label_up": false,
+      "had_regrasp": 0,
+      "label_semantics": "pre_grasp_label_visibility",
+      "reason": "目标包裹：红色料箱内右侧的浅蓝色包裹，夹爪在08.40s接近并夹取该目标，区别于左侧白色包裹；夹取经过：夹爪在08.40s发出闭合指令，08.90s反馈显示闭合夹持，随后保持夹持状态移动并放置，未见重新打开或再次夹取；夹取前标签可见性（grasp_label_up）：未明显看到标签（false），在07.90s及之前的初始观察阶段，目标包裹表面仅见浅蓝色包装，未观察到白底黑字或条形码等标签特征，标签仅在放置后的15.30s才可见；证据局限：初始阶段包裹堆叠，可能存在遮挡。"
+    }
+  },
+  "frame_count": 669,
+  "labels": {
+    "demo_valid": null,
+    "failure_reasons": [],
+    "grasp_label_up": false,
+    "grasped": null,
+    "had_regrasp": 0,
+    "label_up": null,
+    "placed_on_conveyor": null
+  },
+  "model": {
+    "confidence": null,
+    "name": "qwen3.8-27b",
+    "version": "b8ff113dabae4694fecff58337fde0f8209906b2fd36aa0f8e5afda6ef56a5a0"
+  },
+  "reviews": [],
+  "schema_version": "package_labels.v1",
+  "source_episode_id": "00659736-5541-45a0-a834-8a700733ed0f",
+  "source_manifest_sha256": "501f33c231c8c1bf4f75edb06085af7546e50347b925fc82566d6e181ac947b7",
+  "source_relative_path": "raw/package_raw_data/00659736-5541-45a0-a834-8a700733ed0f",
+  "start_timestamp_ns": 1781180003291737856,
+  "status": "approved",
+  "source_episode_index": 1,
+  "source_dataset_root": "/home/bjtc/Sophix/datasets/marked_data_0916"
+}

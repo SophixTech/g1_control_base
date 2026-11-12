@@ -1,0 +1,39 @@
+{
+  "frames": 276886,
+  "files": 1,
+  "checks": {
+    "observation.state.arm.position": {
+      "mean": 0.0,
+      "std": 0.0,
+      "min": 0.0,
+      "max": 0.0
+    },
+    "observation.state.effector.position": {
+      "mean": 0.0,
+      "std": 0.0,
+      "min": 0.0,
+      "max": 0.0
+    },
+    "action.effector.position": {
+      "mean": 0.0,
+      "std": 0.0,
+      "min": 0.0,
+      "max": 0.0
+    },
+    "action.arm.position": {
+      "mean": 0.0,
+      "std": 0.0,
+      "min": 0.0,
+      "max": 0.0
+    }
+  },
+  "left_action_minus_state_max": [
+    0.0007976293563842773,
+    0.00045371055603027344,
+    0.0004559755325317383,
+    0.0005758404731750488,
+    0.0007284879684448242,
+    0.001328587532043457,
+    0.0002461671829223633
+  ]
+}

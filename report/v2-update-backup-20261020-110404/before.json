@@ -1,0 +1,5 @@
+{
+  "head": "be969b8fd117fb70550c5d4bf4bc328211b5b1b6\n",
+  "status": "?? .environment/\n?? .gitignore\n?? REPORT_ORI_TO_V2.md\n?? activate_uv.sh\n?? gripper_mapping_ablation_20261019/\n",
+  "remotes": "origin\thttps://github.com/Robbyant/lingbot-vla-v2.git (fetch)\norigin\thttps://github.com/Robbyant/lingbot-vla-v2.git (push)\n"
+}

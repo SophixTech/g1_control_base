@@ -1,0 +1,111 @@
+{
+  "source_dataset": "/home/bjtc/Sophix/datasets/datav2_1015_split/train",
+  "selection": "first three training episodes",
+  "episodes": [
+    {
+      "episode_index": 0,
+      "source_episode_id": "df1f339e-41c1-4568-9de3-cc5e28fd4f8e",
+      "source_create_time": "2026-10-09 17:46:05",
+      "frame_count": 765,
+      "videos": {
+        "head": {
+          "source": "/home/bjtc/Sophix/datasets/datav2_1015_split/train/videos/observation.images.cam_high_rgb/chunk-000/file-000.mp4",
+          "file": "episode_000000/head.mp4",
+          "width": 768,
+          "height": 480,
+          "r_frame_rate": "30/1",
+          "duration": "25.500000",
+          "nb_frames": "765"
+        },
+        "left_hand": {
+          "source": "/home/bjtc/Sophix/datasets/datav2_1015_split/train/videos/observation.images.cam_left_wrist_rgb/chunk-000/file-000.mp4",
+          "file": "episode_000000/left_hand.mp4",
+          "width": 848,
+          "height": 480,
+          "r_frame_rate": "30/1",
+          "duration": "25.500000",
+          "nb_frames": "765"
+        },
+        "right_hand": {
+          "source": "/home/bjtc/Sophix/datasets/datav2_1015_split/train/videos/observation.images.cam_right_wrist_rgb/chunk-000/file-000.mp4",
+          "file": "episode_000000/right_hand.mp4",
+          "width": 848,
+          "height": 480,
+          "r_frame_rate": "30/1",
+          "duration": "25.500000",
+          "nb_frames": "765"
+        }
+      }
+    },
+    {
+      "episode_index": 1,
+      "source_episode_id": "ab775e26-99cd-402e-b95c-44e9daa770b3",
+      "source_create_time": "2026-10-09 17:46:51",
+      "frame_count": 753,
+      "videos": {
+        "head": {
+          "source": "/home/bjtc/Sophix/datasets/datav2_1015_split/train/videos/observation.images.cam_high_rgb/chunk-000/file-001.mp4",
+          "file": "episode_000001/head.mp4",
+          "width": 768,
+          "height": 480,
+          "r_frame_rate": "30/1",
+          "duration": "25.100000",
+          "nb_frames": "753"
+        },
+        "left_hand": {
+          "source": "/home/bjtc/Sophix/datasets/datav2_1015_split/train/videos/observation.images.cam_left_wrist_rgb/chunk-000/file-001.mp4",
+          "file": "episode_000001/left_hand.mp4",
+          "width": 848,
+          "height": 480,
+          "r_frame_rate": "30/1",
+          "duration": "25.100000",
+          "nb_frames": "753"
+        },
+        "right_hand": {
+          "source": "/home/bjtc/Sophix/datasets/datav2_1015_split/train/videos/observation.images.cam_right_wrist_rgb/chunk-000/file-001.mp4",
+          "file": "episode_000001/right_hand.mp4",
+          "width": 848,
+          "height": 480,
+          "r_frame_rate": "30/1",
+          "duration": "25.100000",
+          "nb_frames": "753"
+        }
+      }
+    },
+    {
+      "episode_index": 2,
+      "source_episode_id": "b763949a-1b1f-44d8-9f6d-2d54804439b7",
+      "source_create_time": "2026-10-09 17:52:21",
+      "frame_count": 819,
+      "videos": {
+        "head": {
+          "source": "/home/bjtc/Sophix/datasets/datav2_1015_split/train/videos/observation.images.cam_high_rgb/chunk-000/file-002.mp4",
+          "file": "episode_000002/head.mp4",
+          "width": 768,
+          "height": 480,
+          "r_frame_rate": "30/1",
+          "duration": "27.300000",
+          "nb_frames": "819"
+        },
+        "left_hand": {
+          "source": "/home/bjtc/Sophix/datasets/datav2_1015_split/train/videos/observation.images.cam_left_wrist_rgb/chunk-000/file-002.mp4",
+          "file": "episode_000002/left_hand.mp4",
+          "width": 848,
+          "height": 480,
+          "r_frame_rate": "30/1",
+          "duration": "27.300000",
+          "nb_frames": "819"
+        },
+        "right_hand": {
+          "source": "/home/bjtc/Sophix/datasets/datav2_1015_split/train/videos/observation.images.cam_right_wrist_rgb/chunk-000/file-002.mp4",
+          "file": "episode_000002/right_hand.mp4",
+          "width": 848,
+          "height": 480,
+          "r_frame_rate": "30/1",
+          "duration": "27.300000",
+          "nb_frames": "819"
+        }
+      }
+    }
+  ]
+}

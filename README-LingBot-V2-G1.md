@@ -4,7 +4,7 @@ Open-RAIL 新增独立模型类型 `lingbot_v2`，对应相邻目录 `ORI-lingbo
 
 ## 启动
 
-先准备 **V2 在 package_a2d 上训练的 checkpoint** 及该次训练使用的归一化统计。不要把旧 ORI 权重传给 V2。当前本地 V2 仓库尚无 `package_a2d` 训练配置；本次补齐的是 Open-RAIL 部署适配，不包含训练和权重生成。
+先准备 **V2 在 package_a2d 上训练的 checkpoint** 及该次训练使用的归一化统计。不要把旧 ORI 权重传给 V2。本地可用权重目录为 `ORI-lingbot-vlaV2/trainedmodel/11-2-data-23to30/hf_ckpt`，归一化文件为同级目录中的 `norm.json`。
 
 ```bash
 scripts/run_lingbot_v2_server.sh \
@@ -13,6 +13,16 @@ scripts/run_lingbot_v2_server.sh \
   --chunk_size 50 \
   --num_denoising_step 10
 ```
+
+
+  cd /home/bjtc/Sophix/g1-open-rail
+
+  scripts/run_lingbot_v2_server.sh \
+    --model_path /home/bjtc/Sophix/ORI-lingbot-vlaV2/trainedmodel/11-2-data-23to30/hf_ckpt \
+    --norm_path /home/bjtc/Sophix/ORI-lingbot-vlaV2/trainedmodel/11-2-data-23to30/norm.json \
+    --chunk_size 50 \
+    --num_denoising_step 10 \
+    --image_profile original
 
 原生 V2 loader 从 `hf_ckpt` 向上三级读取训练配置，目录应为：
 
@@ -25,7 +35,7 @@ run/
             └── *.safetensors
 ```
 
-该 YAML 的 `model`、`train`、`data` 必须来自此次训练，不能用示例配置替代。完整目录迁移时保留这个结构。`--chunk_size` 支持 25、50，必须等于训练时的动作长度。
+该 YAML 的 `model`、`train`、`data` 必须来自此次训练，不能用示例配置或 V1 训练 YAML 替代。对当前 `trainedmodel/11-2-data-23to30/hf_ckpt` 路径，加载器实际读取的是 V2 仓库根目录的 `lingbotvla_cli.yaml`；本次未改动该训练配置，其是否对应新权重仍需核实。完整目录迁移时保留这个结构。`--chunk_size` 支持 25、50，必须等于训练时的动作长度。
 
 启动脚本默认使用：
 
@@ -39,9 +49,11 @@ run/
 scripts/run_lingbot_v2_g1_client.sh
 ```
 
-网页地址为 `http://127.0.0.1:9002`，客户端配置是 `conf/lingbot_v2_package.yaml`。启动网页不会自动切换机器人模式。控制参数初值复制当前 ORI 配置：`rdm.mode=async`、块内 `fitting`、块间 `min_jerk`；本次不改变融合算法。
+网页地址为 `http://127.0.0.1:9002`，客户端配置是 `conf/lingbot_v2_package.yaml`。启动网页不会自动切换机器人模式。2026-11-02 已按 ORI V1 当前部署 YAML 对齐：`rdm.mode=async`、块内 `fitting`、块间 `smooth_velocity`，speed=1.3、wait_time=10 ms、控制周期=3.75 ms。启用左臂保持和夹爪零阶保持，关闭右夹爪四次方映射，夹爪延迟=0 点、下发分频=9。左臂 Default 使用 `robot_pose_20261102_211041.txt` 的前七个关节角，腰部 Default 高度为 46.677994 cm。
 
-`conf/lingbot_v2_package_language.json` 提供取包任务示例。**部署前换成 V2 训练实际使用的完整指令**。图像默认 `--image_profile original`；仅当该 checkpoint 使用对应裁剪数据训练时，选择 `--image_profile crop_1016`。
+V2 配置是独立副本，之后编辑 V1 不会自动影响 V2。除独立的任务 JSON 路径和录制目录 `data/lingbot_v2_package` 外，其余 YAML 参数均与此次 V1 文件一致，包括记录 action_shape=22（记录器会对较短动作补零）。这只是客户端配置对齐，V2 的模型源码、Python 环境、权重、归一化和图像预处理实现仍由 V2 入口负责。重启客户端后加载；修改配置本身不会发送机器人运动指令。
+
+`conf/lingbot_v2_package_language.json` 已复制 V1 当前的侧面夹包裹指令，文件保持独立。该操作不证明提示词与 V2 训练数据一致，需以这次训练实际使用的指令为准。图像默认 `--image_profile original`；仅当该 checkpoint 使用对应裁剪数据训练时，选择 `--image_profile crop_1016`。
 
 ## V2 适配具体做了什么
 

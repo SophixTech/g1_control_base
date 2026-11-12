@@ -1,0 +1,20 @@
+  conveyor_gate:
+    camera: cam.head
+    detect_hz: 10.0
+    enabled: false
+    frame_timeout_s: 0.5
+    hsv_red_ranges:
+    - - 0
+      - 10
+    - - 170
+      - 179
+    min_blob_area_px: 20
+    min_visible: 3
+    reference_size:
+    - 1280
+    - 800
+    resume_stable_s: 0.5
+    rois: []
+    saturation_min: 100
+    stop_delay_s: 2.0
+    value_min: 60

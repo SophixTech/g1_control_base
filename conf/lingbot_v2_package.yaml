@@ -6,10 +6,10 @@ controller:
   gripper_offset: 0
   period: 3.75
   raw_fps: 30
-  speed: 1.5
-  wait_time: 100
+  speed: 1.0
+  wait_time: 10
 inter_chunk:
-  inter_chunk_mode: min_jerk
+  inter_chunk_mode: smooth_velocity
   min_jerk:
     adaptive_factor: -1.0
     blend_threshold: 0.7
@@ -22,11 +22,11 @@ inter_chunk:
     kf_vel: 2.5
   sync: {}
 intra_chunk:
-  gripper_zero_order_hold: false
   filter_window_size: 4
   fitting_deg: 4
   fitting_num_samples: 64
   gripper_dim: 2
+  gripper_zero_order_hold: true
   head_dim: 2
   intra_chunk_mode: fitting
   joint_dim: 14
@@ -58,7 +58,7 @@ record:
   is_record_eval_log: false
   is_record_expe_data: false
   lerobot:
-    action_shape: 16
+    action_shape: 22
     cam.hand_left:
       encode:
         codec: mp4v
@@ -113,13 +113,13 @@ robots:
         presets:
           left:
             Default:
-            - -2.57445097
-            - -0.13783756
-            - 2.31744719
-            - -1.235425
-            - 0.27574492
-            - 1.09134042
-            - 0.07435445
+            - -2.575305938720703
+            - 0.12527355551719666
+            - 2.2491304874420166
+            - -1.2786139249801636
+            - 0.21114501357078552
+            - 1.2086044549942017
+            - -0.05613664910197258
             Custom:
             - -1.0748
             - 0.6107
@@ -186,7 +186,7 @@ robots:
         presets:
           Default:
           - 0.53857462
-          - 50.677994
+          - 46.677994
           Custom:
           - 0.4012
           - 27.0
@@ -218,15 +218,16 @@ robots:
       non_ref_fetch_workers: 2
       ref: head
     gripper_freq: 9
-    right_gripper_quartic_enabled: true
     hand_type: gripper
     head_freq: 40
+    hold_left_arm: true
     manual_arm_interval: 0.01
     proprio_names:
     - arm
     - gripper
     - head
     - waist
+    right_gripper_quartic_enabled: false
   mock:
     action_layout:
       arm:
@@ -585,25 +586,45 @@ robots:
   type: agibot_g1
 vision:
   conveyor_gate:
-    enabled: false
     camera: cam.head
-    reference_size:
-    - 1280
-    - 800
-    rois: []
-    min_visible: 3
-    stop_delay_s: 2.0
-    resume_stable_s: 0.5
     detect_hz: 10.0
+    enabled: true
     frame_timeout_s: 0.5
     hsv_red_ranges:
     - - 0
       - 10
     - - 170
       - 179
-    saturation_min: 100
-    value_min: 60
     min_blob_area_px: 20
+    min_visible: 3
+    reference_size:
+    - 1280
+    - 800
+    resume_stable_s: 0.5
+    rois:
+    - - 211
+      - 40
+      - 34
+      - 31
+    - - 258
+      - 103
+      - 29
+      - 23
+    - - 33
+      - 193
+      - 49
+      - 34
+    - - 418
+      - 316
+      - 39
+      - 34
+    - - 152
+      - 455
+      - 48
+      - 45
+    saturation_min: 100
+    stop_delay_s: 0.7
+    value_min: 60
   history_frame: false
   preprocess:
     height: 480
@@ -611,12 +632,12 @@ vision:
     method: none
     width: 640
 visualize:
-  head_mask_preview_enabled: false
-  head_mask_preview_path: ''
   camera:
     open_head: true
     open_wrist_left: true
     open_wrist_right: true
+  head_mask_preview_enabled: false
+  head_mask_preview_path: /home/bjtc/Sophix/ORI-lingbot-vla/mask/data-1023-1028-table-conveyor-v1/table_conveyor_mask.png
   host: 0.0.0.0
   max_size: 10485760
   ping_interval: 20
@@ -625,16 +646,20 @@ visualize:
   trajectory:
     play: true
     selected_joints:
-    - 0
-    - 1
-    - 2
+    - 7
+    - 8
+    - 9
+    - 10
+    - 11
     source:
     - State
-    window_span_sec: 4.0
+    - ActionRaw
+    - ActionFitted
+    window_span_sec: 10.0
   updata_fps: 30
 vla_zmq:
   heartbeat_interval: 1000
   heartbeat_timeout: 30000
-  infer_timeout: 10000
+  infer_timeout: 1500
   ip: 127.0.0.1
   port: '5566'

@@ -1,0 +1,30 @@
+{
+  "samples": 53655,
+  "closed_before": 13952,
+  "closed_to_mid": 975,
+  "open_before": 39032,
+  "open_to_mid": 803,
+  "mid_before": 671,
+  "mid_after": 2449,
+  "switches_before": 616,
+  "switches_after": 508,
+  "short_intervals_before": 285,
+  "short_intervals_after": 184,
+  "closed_runs": 335,
+  "closed_runs_affected": 283,
+  "closed_runs_never_reach_08": 42,
+  "jumps_before": 925,
+  "jumps_after": 473,
+  "event_categories": {
+    "no_full_roundtrip_within_original_window": 141,
+    "still_open_close": 112,
+    "dip_to_middle_only": 23,
+    "never_reaches_closed": 20
+  },
+  "rapid_open_under_05s_categories": {
+    "still_open_close": 81,
+    "no_full_roundtrip_within_original_window": 29,
+    "dip_to_middle_only": 23,
+    "never_reaches_closed": 8
+  }
+}

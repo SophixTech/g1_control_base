@@ -1,0 +1,4 @@
+# Preserve the repository training pins despite broader/incompatible dependency metadata.
+numpy==1.26.4
+pyarrow==21.0.0
+packaging==25.0

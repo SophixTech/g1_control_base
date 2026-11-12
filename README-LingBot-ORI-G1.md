@@ -23,8 +23,8 @@ scripts/run_lingbot_ori_server.sh \
 ```
 
 scripts/run_lingbot_ori_server.sh \
-  --model_path /home/bjtc/Sophix/ORI-lingbot-vla/trained-model/Cmet/10-21-data1019-sidepick/hf_ckpt \
-  --norm_path /home/bjtc/Sophix/ORI-lingbot-vla/trained-model/Cmet/10-21-data1019-sidepick/norm.json \
+  --model_path /home/bjtc/Sophix/ORI-lingbot-vla/trained-model/Cmet/10-30-data23to29-uppick/hf_ckpt \
+  --norm_path /home/bjtc/Sophix/ORI-lingbot-vla/trained-model/Cmet/10-30-data23to29-uppick/norm.json \
   --chunk_size 50 \
   --num_denoising_step 10 \
 
@@ -67,8 +67,8 @@ python3 scripts/export_gripper_trace.py logs/gripper_traces/实际会话目录
 ```bash
 cd /home/bjtc/Sophix/g1-open-rail
 scripts/run_lingbot_ori_server.sh \
-  --model_path /home/bjtc/Sophix/ORI-lingbot-vla/trained-model/10-18-cut0922/6whf_ckpt \
-  --norm_path /home/bjtc/Sophix/ORI-lingbot-vla/trained-model/10-18-cut0922/norm.json \
+  --model_path /home/bjtc/Sophix/ORI-lingbot-vla/trained-model/Cmet/11-02-data23to30/hf_ckpt \
+  --norm_path /home/bjtc/Sophix/ORI-lingbot-vla/trained-model/Cmet/11-02-data23to30/norm.json \
   --chunk_size 50 \
   --num_denoising_step 10 \
   --image_profile original
@@ -168,12 +168,12 @@ ORI 新增固定二值遮罩：白色保留原图，黑色区域置黑。它与 
 ```bash
 cd /home/bjtc/Sophix/g1-open-rail
 scripts/run_lingbot_ori_server.sh \
-  --model_path /实际训练输出/hf_ckpt \
-  --norm_path /该次训练使用的/norm.json \
+  --model_path /home/bjtc/Sophix/ORI-lingbot-vla/trained-model/Cmet/10-30-data23to29-mask-uppick/hf_ckpt \
+  --norm_path /home/bjtc/Sophix/ORI-lingbot-vla/trained-model/Cmet/10-30-data23to29-mask-uppick/norm.json \
   --chunk_size 50 --num_denoising_step 10 \
   --image_profile original \
   --image-mask-enabled \
-  --image-mask-path /home/bjtc/Sophix/ORI-lingbot-vla/mask/data-v1/union_mask.png \
+  --image-mask-path /home/bjtc/Sophix/ORI-lingbot-vla/mask/data-1023-1028-table-conveyor-v1/table_conveyor_mask.png \
   --image-mask-camera observation.images.cam_high_rgb
 ```
 

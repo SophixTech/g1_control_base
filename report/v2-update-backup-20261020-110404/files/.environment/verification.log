@@ -1,0 +1,25 @@
+All repository dependency pins match
+IMPORT OK torch /home/bjtc/Sophix/ORI-lingbot-vlaV2/.venv/lib/python3.12/site-packages/torch/__init__.py
+IMPORT OK torchvision /home/bjtc/Sophix/ORI-lingbot-vlaV2/.venv/lib/python3.12/site-packages/torchvision/__init__.py
+IMPORT OK torchaudio /home/bjtc/Sophix/ORI-lingbot-vlaV2/.venv/lib/python3.12/site-packages/torchaudio/__init__.py
+IMPORT OK torchcodec /home/bjtc/Sophix/ORI-lingbot-vlaV2/.venv/lib/python3.12/site-packages/torchcodec/__init__.py
+IMPORT OK flash_attn /home/bjtc/Sophix/ORI-lingbot-vlaV2/.venv/lib/python3.12/site-packages/flash_attn/__init__.py
+IMPORT OK transformers /home/bjtc/Sophix/ORI-lingbot-vlaV2/.venv/lib/python3.12/site-packages/transformers/__init__.py
+IMPORT OK lerobot /home/bjtc/Sophix/ORI-lingbot-vlaV2/.venv/lib/python3.12/site-packages/lerobot/__init__.py
+IMPORT OK numpydantic /home/bjtc/Sophix/ORI-lingbot-vlaV2/.venv/lib/python3.12/site-packages/numpydantic/__init__.py
+IMPORT OK cv2 /home/bjtc/Sophix/ORI-lingbot-vlaV2/.venv/lib/python3.12/site-packages/cv2/__init__.py
+IMPORT OK accelerate /home/bjtc/Sophix/ORI-lingbot-vlaV2/.venv/lib/python3.12/site-packages/accelerate/__init__.py
+IMPORT OK mlflow /home/bjtc/Sophix/ORI-lingbot-vlaV2/.venv/lib/python3.12/site-packages/mlflow/__init__.py
+IMPORT OK oss2 /home/bjtc/Sophix/ORI-lingbot-vlaV2/.venv/lib/python3.12/site-packages/oss2/__init__.py
+IMPORT OK moge.model.v2 /home/bjtc/Sophix/ORI-lingbot-vlaV2/lingbotvla/models/vla/vision_models/MoGe/moge/model/v2.py
+IMPORT OK mdm.model.v2 /home/bjtc/Sophix/ORI-lingbot-vlaV2/lingbotvla/models/vla/vision_models/lingbot-depth/mdm/model/v2.py
+IMPORT OK utils3d /home/bjtc/Sophix/ORI-lingbot-vlaV2/.venv/lib/python3.12/site-packages/utils3d/__init__.py
+IMPORT OK lingbotvla.utils.normalize /home/bjtc/Sophix/ORI-lingbot-vlaV2/lingbotvla/utils/normalize.py
+/home/bjtc/Sophix/ORI-lingbot-vlaV2/.venv/lib/python3.12/site-packages/pydantic/_internal/_generate_schema.py:2274: UnsupportedFieldAttributeWarning: The 'repr' attribute with value False was provided to the `Field()` function, which has no effect in the context it was used. 'repr' is field-specific metadata, and can only be attached to a model field using `Annotated` metadata or by assignment. This may have happened because an `Annotated` type alias using the `type` statement was used, or if the `Field()` function was attached to a single member of a union type.
+  warnings.warn(
+/home/bjtc/Sophix/ORI-lingbot-vlaV2/.venv/lib/python3.12/site-packages/pydantic/_internal/_generate_schema.py:2274: UnsupportedFieldAttributeWarning: The 'frozen' attribute with value True was provided to the `Field()` function, which has no effect in the context it was used. 'frozen' is field-specific metadata, and can only be attached to a model field using `Annotated` metadata or by assignment. This may have happened because an `Annotated` type alias using the `type` statement was used, or if the `Field()` function was attached to a single member of a union type.
+  warnings.warn(
+Overwriting feature type 'VideoFrame' (VideoFrame -> VideoFrame)
+Training entry import OK
+Torch 2.8.0+cu128 CUDA 12.8 available True
+FlashAttention CUDA forward OK: NVIDIA GeForce RTX 4090

@@ -1,0 +1,228 @@
+G1 实际反馈姿态快照
+记录时间: 2026-11-02T21:10:41.803677+08:00
+仅订阅反馈，未发送运动指令。各主题为独立最新采样，非硬件同步快照。
+
+[arm] /hal/arm_joint_state
+消息时间: 2026-11-02T21:10:41.773890+08:00
+记录时消息年龄: 0.029786 s
+记录时接收年龄: 0.000695 s
+顺序: L0–L6, R0–R6
+rad: [-2.575305938720703, 0.12527355551719666, 2.2491304874420166, -1.2786139249801636, 0.21114501357078552, 1.2086044549942017, -0.05613664910197258, 2.499939441680908, 0.04662640020251274, -1.8029688596725464, 0.7495647668838501, -1.0279794931411743, -1.4720994234085083, -0.2408972531557083]
+deg: [-147.554161, 7.177646, 128.865685, -73.259182, 12.097718, 69.247934, -3.216393, 143.235979, 2.671496, -103.302506, 42.946898, -58.898886, -84.345084, -13.802396]
+完整原始反馈:
+{
+  "position": [
+    -2.575305938720703,
+    0.12527355551719666,
+    2.2491304874420166,
+    -1.2786139249801636,
+    0.21114501357078552,
+    1.2086044549942017,
+    -0.05613664910197258,
+    2.499939441680908,
+    0.04662640020251274,
+    -1.8029688596725464,
+    0.7495647668838501,
+    -1.0279794931411743,
+    -1.4720994234085083,
+    -0.2408972531557083
+  ],
+  "header": {
+    "stamp": {
+      "sec": 1793625041,
+      "nanosec": 773890358
+    },
+    "frame_id": ""
+  },
+  "name": [
+    "left_arm_joint1",
+    "left_arm_joint2",
+    "left_arm_joint3",
+    "left_arm_joint4",
+    "left_arm_joint5",
+    "left_arm_joint6",
+    "left_arm_joint7",
+    "right_arm_joint1",
+    "right_arm_joint2",
+    "right_arm_joint3",
+    "right_arm_joint4",
+    "right_arm_joint5",
+    "right_arm_joint6",
+    "right_arm_joint7"
+  ],
+  "velocity": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+  ],
+  "effort": []
+}
+
+[head] /hal/neck_state
+消息时间: 2026-11-02T21:10:41.768964+08:00
+记录时消息年龄: 0.034713 s
+记录时接收年龄: 0.004479 s
+joint_head_yaw: -0.208813131 rad = -11.964111 deg
+joint_head_pitch: 0.436342958 rad = 25.000610 deg
+完整原始反馈:
+{
+  "motor_states": [
+    {
+      "position": -0.20881313118896483,
+      "effort": -0.106,
+      "err_code": 0,
+      "enable": true,
+      "status": 1591,
+      "velocity": 0.0,
+      "id": 0,
+      "current": 0.0,
+      "voltage": 0.0,
+      "temperature": 0.0
+    },
+    {
+      "position": 0.4363429581997342,
+      "effort": 0.042,
+      "err_code": 0,
+      "enable": true,
+      "status": 1591,
+      "velocity": 0.0,
+      "id": 1,
+      "current": 0.0,
+      "voltage": 0.0,
+      "temperature": 0.0
+    }
+  ],
+  "header": {
+    "stamp": {
+      "sec": 1793625041,
+      "nanosec": 768963529
+    },
+    "frame_id": ""
+  },
+  "name": [
+    "joint_head_yaw",
+    "joint_head_pitch"
+  ]
+}
+
+[waist] /hal/waist_state
+消息时间: 2026-11-02T21:10:41.768980+08:00
+记录时消息年龄: 0.034697 s
+记录时接收年龄: 0.004383 s
+joint_body_pitch: 0.538573831 rad = 30.858007 deg
+joint_lift_body: 0.466779938 m = 46.677994 cm
+完整原始反馈:
+{
+  "motor_states": [
+    {
+      "position": 0.5385738312687142,
+      "effort": -0.396,
+      "err_code": 0,
+      "enable": true,
+      "status": 1591,
+      "velocity": 0.0,
+      "id": 0,
+      "current": 0.0,
+      "voltage": 0.0,
+      "temperature": 0.0
+    },
+    {
+      "position": 0.4667799377441406,
+      "effort": 0.0,
+      "err_code": 0,
+      "voltage": 3080.192,
+      "enable": true,
+      "status": 54839,
+      "current": 47000.0,
+      "velocity": -5984.0,
+      "id": 1,
+      "temperature": 0.0
+    }
+  ],
+  "header": {
+    "stamp": {
+      "sec": 1793625041,
+      "nanosec": 768980137
+    },
+    "frame_id": ""
+  },
+  "name": [
+    "joint_body_pitch",
+    "joint_lift_body"
+  ]
+}
+
+[left_gripper] /hal/left_ee_data
+消息时间: 2026-11-02T21:10:41.773928+08:00
+记录时消息年龄: 0.029749 s
+记录时接收年龄: 0.000572 s
+原始 end_state.position（未归一化）: [0.21733333333333293]
+完整原始反馈:
+{
+  "type": 2,
+  "header": {
+    "stamp": {
+      "sec": 1793625041,
+      "nanosec": 773927670
+    },
+    "frame_id": ""
+  },
+  "end_state": [
+    {
+      "position": 0.21733333333333293,
+      "effort": 3.0588235294117645,
+      "enable": true,
+      "status": 0,
+      "current": 0.0,
+      "id": 0,
+      "velocity": 0.0,
+      "voltage": 0.0,
+      "temperature": 0.0,
+      "err_code": 0
+    }
+  ],
+  "controlled": true,
+  "name": [
+    "left_gripper_joint1"
+  ]
+}
+
+[right_gripper] /hal/right_ee_data
+消息时间: 2026-11-02T21:10:41.773947+08:00
+记录时消息年龄: 0.029730 s
+记录时接收年龄: 0.000490 s
+原始 end_state.position（未归一化）: [0.21733333333333293]
+完整原始反馈:
+{
+  "type": 2,
+  "header": {
+    "stamp": {
+      "sec": 1793625041,
+      "nanosec": 773946422
+    },
+    "frame_id": ""
+  },
+  "end_state": [
+    {
+      "position": 0.21733333333333293,
+      "effort": 0.5882352941176471,
+      "enable": true,
+      "status": 0,
+      "current": 0.0,
+      "id": 0,
+      "velocity": 0.0,
+      "voltage": 0.0,
+      "temperature": 0.0,
+      "err_code": 0
+    }
+  ],
+  "controlled": true,
+  "name": [
+    "right_gripper_joint1"
+  ]
+}
+

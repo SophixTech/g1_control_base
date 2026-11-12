@@ -1,0 +1,132 @@
+G1 当前反馈位姿 / Default 配置参考
+采集时间：2026-10-21T21:10:39.793369+08:00
+只读采集；各路时间戳与主机时差均小于 0.5 秒；各路为独立最新反馈，并非硬件同步帧。
+单位：双臂、头部、躯干俯仰为 rad；waist 第二项升降为 cm（HAL 原始反馈 m × 100）。
+双臂顺序：左 L0–L6、右 R0–R6。head 顺序：yaw、pitch；waist 顺序：body_pitch、lift。
+左右夹爪本次原始反馈均为 0，对应当前 SDK 的 Open/Default 指令 0。
+以下仅为应合并到现有 YAML 的 Default 字段，不是完整客户端配置。未修改任何 YAML，未下发动作。
+底盘位置未采集，不作为本次位姿记录。
+
+robots:
+  agibot_g1:
+    action_layout:
+      arm:
+        presets:
+          left:
+            Default:
+            - -1.468173265
+            - -0.096899852
+            - 1.290881157
+            - -0.849989474
+            - 0.423145056
+            - 1.439816952
+            - 0.058579654
+          right:
+            Default:
+            - -0.0156352
+            - -0.664338946
+            - -0.01446605
+            - 1.396348953
+            - -0.635633647
+            - -1.250379682
+            - -0.486436188
+      gripper:
+        presets:
+          left:
+            Default:
+            - 0.0
+          right:
+            Default:
+            - 0.0
+      head:
+        presets:
+          Default:
+          - 0.07429953
+          - 0.436332306
+      waist:
+        presets:
+          Default:
+          - 0.301485853
+          - 44.655044556
+
+原始反馈与各路时间戳（便于复核）：
+{
+  "capture_ns": 1792588239793369433,
+  "streams": {
+    "arm": {
+      "stamp_ns": 1792588239817507141,
+      "names": [
+        "left_arm_joint1",
+        "left_arm_joint2",
+        "left_arm_joint3",
+        "left_arm_joint4",
+        "left_arm_joint5",
+        "left_arm_joint6",
+        "left_arm_joint7",
+        "right_arm_joint1",
+        "right_arm_joint2",
+        "right_arm_joint3",
+        "right_arm_joint4",
+        "right_arm_joint5",
+        "right_arm_joint6",
+        "right_arm_joint7"
+      ],
+      "positions": [
+        -1.4681732654571533,
+        -0.0968998521566391,
+        1.2908811569213867,
+        -0.8499894738197327,
+        0.423145055770874,
+        1.439816951751709,
+        0.05857965350151062,
+        -0.01563519984483719,
+        -0.6643389463424683,
+        -0.014466050080955029,
+        1.3963489532470703,
+        -0.635633647441864,
+        -1.2503796815872192,
+        -0.4864361882209778
+      ]
+    },
+    "left_gripper": {
+      "stamp_ns": 1792588239817545511,
+      "names": [
+        "left_gripper_joint1"
+      ],
+      "positions": [
+        0.0
+      ]
+    },
+    "right_gripper": {
+      "stamp_ns": 1792588239817562632,
+      "names": [
+        "right_gripper_joint1"
+      ],
+      "positions": [
+        0.0
+      ]
+    },
+    "head": {
+      "stamp_ns": 1792588239792565144,
+      "names": [
+        "joint_head_yaw",
+        "joint_head_pitch"
+      ],
+      "positions": [
+        0.0742995299847073,
+        0.4363323055555555
+      ]
+    },
+    "waist": {
+      "stamp_ns": 1792588239792582937,
+      "names": [
+        "joint_body_pitch",
+        "joint_lift_body"
+      ],
+      "positions": [
+        0.3014858532399075,
+        0.44655044555664064
+      ]
+    }
+  }
+}
